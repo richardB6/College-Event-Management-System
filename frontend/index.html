@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClubHub — Home</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="public-layout">
+
+    <header class="main-navbar">
+        <div class="nav-brand">
+            <div class="nav-brand-icon">🎓</div>
+            ClubHub
+        </div>
+        <nav class="nav-links">
+            <a href="index.html" class="active">Home</a>
+            <a href="students.html">Students</a>
+            <a href="registrations.html">Registrations</a>
+        </nav>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">🌓</button>
+            <a href="admin-login.html" class="btn btn-secondary btn-sm">🛡️ Admin Panel</a>
+        </div>
+    </header>
+
+    <main style="padding: 60px 48px; text-align: center; max-width: 800px; margin: 0 auto;">
+        <h1 style="font-size: 3rem; margin-bottom: 20px;">Welcome to ClubHub</h1>
+        <p style="font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 40px;">
+            Your one-stop platform for managing student records and registering for exciting club events.
+        </p>
+        
+        <div style="display: flex; gap: 20px; justify-content: center;">
+            <a href="students.html" class="btn btn-primary" style="padding: 14px 28px; font-size: 1rem;">View Students</a>
+            <a href="registrations.html" class="btn btn-secondary" style="padding: 14px 28px; font-size: 1rem;">Register for Event</a>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>

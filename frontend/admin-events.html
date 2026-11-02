@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Events — Admin Panel</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">☰</button>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-icon">🛡️</div>
+            <div>
+                <h2>Admin Panel</h2>
+                <span>ClubHub System</span>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="admin.html">
+                <span class="nav-icon">📊</span> Dashboard
+            </a>
+            <a href="admin-clubs.html">
+                <span class="nav-icon">🏛️</span> Manage Clubs
+            </a>
+            <a href="admin-events.html" class="active">
+                <span class="nav-icon">🎉</span> Manage Events
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="index.html" style="color: var(--text-muted); display: block; margin-bottom: 12px;">← Back to Main Site</a>
+            <button onclick="logoutAdmin()" class="btn btn-secondary btn-sm" style="width: 100%;">🚪 Logout</button>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="top-header">
+            <div>
+                <h1>Manage Events</h1>
+                <p class="header-subtitle">Schedule and organize events</p>
+            </div>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">🌓</button>
+        </header>
+
+        <div class="page-content">
+            <div class="section-panel">
+                <div class="section-header">
+                    <h2 id="eventFormTitle"><span class="icon">➕</span> Add New Event</h2>
+                </div>
+                <div class="section-body">
+                    <form id="eventForm" onsubmit="handleEventSubmit(event)">
+                        <input type="hidden" id="editEventId">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="eventName">Event Name</label>
+                                <input type="text" id="eventName" placeholder="e.g. Hackathon 2026" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="eventDate">Event Date</label>
+                                <input type="date" id="eventDate" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="eventLocation">Location</label>
+                                <input type="text" id="eventLocation" placeholder="e.g. Main Auditorium" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="eventClubId">Organizing Club</label>
+                                <select id="eventClubId" required>
+                                    <option value="">— Select Club —</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="eventSubmitBtn">➕ Add Event</button>
+                            <button type="button" class="btn btn-secondary" id="eventCancelBtn" onclick="cancelEventEdit()" style="display:none;">✕ Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="section-panel">
+                <div class="section-header">
+                    <h2><span class="icon">📋</span> All Events</h2>
+                </div>
+                <div class="section-body">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Event Name</th>
+                                    <th>Date</th>
+                                    <th>Location</th>
+                                    <th>Club</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="eventsTableBody">
+                                <tr><td colspan="6" class="empty-state"><p>Loading...</p></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="toast-container" id="toastContainer"></div>
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadEvents();
+            loadClubsDropdown('eventClubId');
+        });
+    </script>
+</body>
+</html>
