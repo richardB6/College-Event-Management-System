@@ -28,7 +28,30 @@ describe('public landing page', () => {
         : path.endsWith('/public/clubs')
           ? [{ club_id: 1, club_name: 'Coding Club' }]
           : path.endsWith('/public/events')
-            ? [{ event_id: 1, event_name: 'Campus Showcase', event_date: '2099-06-10', location: 'Main Hall', club_id: 1, club_name: 'Coding Club' }]
+            ? [{
+              event_id: 1,
+              event_name: 'Campus Showcase',
+              description: 'Campus event',
+              category: 'Workshop',
+              organizer: 'Coding Club',
+              event_date: '2099-06-10',
+              start_time: '10:00',
+              end_date: '2099-06-10',
+              end_time: '11:00',
+              timezone: 'Asia/Kolkata',
+              location: 'Main Hall',
+              club_id: 1,
+              club_name: 'Coding Club',
+              entry_fee: 0,
+              capacity: 100,
+              confirmed_count: 0,
+              available_slots: 100,
+              waitlist_count: 0,
+              registration_opens_at: null,
+              registration_closes_at: null,
+              status: 'published',
+              lifecycle_status: 'registration_open',
+            }]
             : { students: 12, clubs: 1, events: 1 };
       return new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }));

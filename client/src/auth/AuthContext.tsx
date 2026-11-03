@@ -6,7 +6,7 @@ import type { AuthUser } from '../lib/types';
 interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
-  signIn: (path: string, payload: Record<string, string | number>) => Promise<void>;
+  signIn: (path: string, payload: Record<string, string | number>) => Promise<AuthUser>;
   signOut: () => Promise<void>;
 }
 
@@ -25,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await api<{ user: AuthUser }>(path, { method: 'POST', body: JSON.stringify(payload) });
     await refreshCsrfToken();
     queryClient.setQueryData(['auth'], { user: result.user });
+    return result.user;
   }, [queryClient]);
 
   const signOut = useCallback(async () => {

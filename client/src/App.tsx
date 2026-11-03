@@ -1,14 +1,17 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { AdminGuard, PublicLayout, StudentGuard } from './components/Layout';
+import { AdminGuard, OrganizerGuard, PublicLayout, StudentGuard } from './components/Layout';
 import { PageLoader } from './components/ui';
 
 const AdminDashboardPage = lazy(() => import('./pages/AdminPages').then(page => ({ default: page.AdminDashboardPage })));
 const AdminStudentsPage = lazy(() => import('./pages/AdminPages').then(page => ({ default: page.AdminStudentsPage })));
+const AdminStudentDetailPage = lazy(() => import('./pages/AdminPages').then(page => ({ default: page.AdminStudentDetailPage })));
 const AdminClubsPage = lazy(() => import('./pages/AdminPages').then(page => ({ default: page.AdminClubsPage })));
 const AdminEventsPage = lazy(() => import('./pages/AdminPages').then(page => ({ default: page.AdminEventsPage })));
 const AdminRegistrationsPage = lazy(() => import('./pages/AdminPages').then(page => ({ default: page.AdminRegistrationsPage })));
 const AdminActivityPage = lazy(() => import('./pages/AdminPages').then(page => ({ default: page.AdminActivityPage })));
+const AdminOrganizersPage = lazy(() => import('./pages/AdminPages').then(page => ({ default: page.AdminOrganizersPage })));
+const AdminSettingsPage = lazy(() => import('./pages/AdminPages').then(page => ({ default: page.AdminSettingsPage })));
 const AdminLoginPage = lazy(() => import('./pages/AuthPages').then(page => ({ default: page.AdminLoginPage })));
 const StudentLoginPage = lazy(() => import('./pages/AuthPages').then(page => ({ default: page.StudentLoginPage })));
 const StudentRegisterPage = lazy(() => import('./pages/AuthPages').then(page => ({ default: page.StudentRegisterPage })));
@@ -36,10 +39,17 @@ export default function App() {
       <Route path="admin" element={<AdminGuard />}>
         <Route index element={<AdminDashboardPage />} />
         <Route path="students" element={<AdminStudentsPage />} />
+        <Route path="students/:studentId" element={<AdminStudentDetailPage />} />
         <Route path="clubs" element={<AdminClubsPage />} />
         <Route path="events" element={<AdminEventsPage />} />
         <Route path="registrations" element={<AdminRegistrationsPage />} />
         <Route path="activity" element={<AdminActivityPage />} />
+        <Route path="organizers" element={<AdminOrganizersPage />} />
+        <Route path="settings" element={<AdminSettingsPage />} />
+      </Route>
+      <Route path="organizer" element={<OrganizerGuard />}>
+        <Route path="events" element={<AdminEventsPage />} />
+        <Route path="registrations" element={<AdminRegistrationsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

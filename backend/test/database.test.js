@@ -42,12 +42,12 @@ test('migration adds account tables while preserving all legacy records and rela
 
     migrateDatabase(db);
 
-    assert.equal(db.pragma('user_version', { simple: true }), 1);
+    assert.equal(db.pragma('user_version', { simple: true }), 3);
     assert.equal(db.prepare('SELECT COUNT(*) AS count FROM STUDENT').get().count, 2);
     assert.equal(db.prepare('SELECT COUNT(*) AS count FROM CLUB').get().count, 1);
     assert.equal(db.prepare('SELECT COUNT(*) AS count FROM EVENT').get().count, 1);
     assert.equal(db.prepare('SELECT COUNT(*) AS count FROM REGISTRATION').get().count, 1);
-    const legacy = db.prepare('SELECT usn, email, password_hash, account_status, created_at FROM STUDENT WHERE student_id = 1').get();
+    const legacy = db.prepare('SELECT usn, email, password_hash, account_status, created_at, department_code FROM STUDENT WHERE student_id = 1').get();
     assert.deepEqual({ usn: legacy.usn, email: legacy.email, password_hash: legacy.password_hash, account_status: legacy.account_status }, {
         usn: null,
         email: null,
@@ -55,5 +55,16 @@ test('migration adds account tables while preserving all legacy records and rela
         account_status: 'active',
     });
     assert.ok(legacy.created_at);
+    assert.equal(legacy.department_code, null);
+    assert.equal(db.prepare('SELECT entry_fee, capacity, status FROM EVENT WHERE event_id = 1').get().capacity, 1000);
+    assert.equal(db.prepare('SELECT status FROM REGISTRATION WHERE reg_id = 1').get().status, 'confirmed');
+    assert.equal(db.prepare('SELECT COUNT(*) AS count FROM DEPARTMENTS').get().count, 5);
     assert.equal(db.pragma('foreign_key_check').length, 0);
+    assert.throws(() => db.prepare('UPDATE STUDENT SET year = 5 WHERE student_id = 1').run(), /INVALID_ACADEMIC_YEAR/);
+    assert.throws(() => db.prepare('INSERT INTO STUDENT (fname, lname, year, branch) VALUES (?, ?, ?, ?)')
+        .run('Out', 'OfRange', 6, 'Computer Science'), /INVALID_ACADEMIC_YEAR/);
+    db.prepare('UPDATE STUDENT SET year = 4 WHERE student_id = 1').run();
+    assert.equal(db.prepare('SELECT year FROM STUDENT WHERE student_id = 1').get().year, 4);
+    assert.throws(() => db.prepare('UPDATE EVENT SET capacity = 0 WHERE event_id = 1').run());
+    assert.throws(() => db.prepare("UPDATE EVENT SET status = 'draft' WHERE event_id = 1").run(), /INVALID_EVENT_STATUS_TRANSITION/);
 });

@@ -51,7 +51,11 @@ For frontend development with hot reload, run `npm run dev` from `client` in a s
 
 The database is `database/club_management.db`. On startup, the backend applies versioned migrations under `backend/migrations/`. The account/session/audit migration adds authentication fields and tables without deleting or rewriting existing club, event, registration, or student records. Existing students remain without accounts until separately registered.
 
-Back up the database before deploying an application update that runs migrations. The backend seeds the sample campus records only when the student table is empty.
+Migration `002_academic_events_registrations.sql` adds the recognized department reference data, club memberships, event schedules and capacity, registration statuses and waitlists, notification storage, scheduling-conflict records, and waitlist settings. Migration `003_academic_years_one_to_four.sql` limits new and updated student records to academic years 1–4. Legacy branch labels are mapped only when they match a known department; other labels are retained and left unassigned.
+
+Back up the database before deploying an application update that runs migrations. The backend seeds the sample campus records only when the student table is empty. The production server checks for expired waitlist offers once per minute; if the process is stopped, expiration processing resumes on startup and on registration-related requests. Notifications are in-app only; email delivery is not configured.
+
+Administrators can change the waitlist confirmation window under **Admin → Settings** (5–1,440 minutes). The setting applies to newly created offers; it does not change deadlines already issued. Club organizers have access only to event and registration data for their assigned club.
 
 ## Tests
 

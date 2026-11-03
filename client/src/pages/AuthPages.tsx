@@ -6,6 +6,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuth } from '../auth/AuthContext';
 import { api } from '../lib/api';
+import type { Department } from '../lib/types';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../components/ui';
 
@@ -30,8 +31,8 @@ const registrationSchema = (pattern: string) => z.object({
   email: gmail,
   password,
   password_confirmation: z.string(),
-  year: z.coerce.number().int().min(1).max(8),
-  branch: z.string().trim().min(1, 'Enter your branch.').max(80),
+  year: z.coerce.number().int().min(1).max(4),
+  department_code: z.string().min(1, 'Choose your department.'),
 }).refine(value => value.password === value.password_confirmation, {
   path: ['password_confirmation'],
   message: 'Passwords do not match.',
@@ -118,7 +119,11 @@ export function StudentRegisterPage() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const notify = useToast();
-  const patternQuery = useQuery({ queryKey: ['public-config'], queryFn: () => api<{ usn_pattern: string }>('/public/config'), staleTime: Infinity });
+  const patternQuery = useQuery({
+    queryKey: ['public-config'],
+    queryFn: () => api<{ usn_pattern: string; academic_years: number[]; departments: Department[] }>('/public/config'),
+    staleTime: Infinity,
+  });
   const pattern = patternQuery.data?.usn_pattern ?? '^2BU\\d{2}[A-Z]{2}\\d{3}$';
   const schema = useMemo(() => registrationSchema(pattern), [pattern]);
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<RegistrationInput, unknown, RegistrationValues>({ resolver: zodResolver(schema), defaultValues: { year: 1 } });
@@ -144,8 +149,8 @@ export function StudentRegisterPage() {
         <label className="form-field"><span>Full name</span><input {...register('full_name')} placeholder="Your name as it appears at university" autoComplete="name" />{errors.full_name && <small className="field-error">{errors.full_name.message}</small>}</label>
         <label className="form-field"><span>Gmail address</span><input {...register('email')} type="email" placeholder="you@gmail.com" autoComplete="email" />{errors.email && <small className="field-error">{errors.email.message}</small>}</label>
         <div className="form-row">
-          <label className="form-field"><span>Year of study</span><select {...register('year')}><option value="1">Year 1</option><option value="2">Year 2</option><option value="3">Year 3</option><option value="4">Year 4</option><option value="5">Year 5</option><option value="6">Year 6</option></select>{errors.year && <small className="field-error">Choose a year.</small>}</label>
-          <label className="form-field"><span>Branch</span><input {...register('branch')} placeholder="e.g. Computer Science" />{errors.branch && <small className="field-error">{errors.branch.message}</small>}</label>
+          <label className="form-field"><span>Year of study</span><select {...register('year')}><option value="">Choose year</option>{(patternQuery.data?.academic_years ?? [1, 2, 3, 4]).map(year => <option value={year} key={year}>{year}{year === 1 ? 'st' : year === 2 ? 'nd' : year === 3 ? 'rd' : 'th'} Year</option>)}</select>{errors.year && <small className="field-error">Choose a year.</small>}</label>
+          <label className="form-field"><span>Department</span><select {...register('department_code')} defaultValue=""><option value="" disabled>Choose department</option>{patternQuery.data?.departments.map(department => <option value={department.department_code} key={department.department_code}>{department.department_name}</option>)}</select>{errors.department_code && <small className="field-error">{errors.department_code.message}</small>}</label>
         </div>
         <PasswordField label="Password" registration={register('password')} error={errors.password?.message} autoComplete="new-password" />
         <PasswordField label="Confirm password" registration={register('password_confirmation')} error={errors.password_confirmation?.message} autoComplete="new-password" />
@@ -165,8 +170,8 @@ export function AdminLoginPage() {
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<AdminValues>({ resolver: zodResolver(adminSchema) });
   const onSubmit = handleSubmit(async values => {
     try {
-      await signIn('/auth/admin/login', values);
-      navigate((location.state as { from?: string } | null)?.from ?? '/admin', { replace: true });
+      const user = await signIn('/auth/admin/login', values);
+      navigate((location.state as { from?: string } | null)?.from ?? (user.role === 'organizer' ? '/organizer/events' : '/admin'), { replace: true });
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Sign in failed.', 'error');
     }

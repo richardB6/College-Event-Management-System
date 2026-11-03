@@ -1,7 +1,12 @@
 let csrfToken: string | undefined;
 
 export class ApiError extends Error {
-  constructor(message: string, public readonly status: number) {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly code?: string,
+    public readonly details?: unknown,
+  ) {
     super(message);
     this.name = 'ApiError';
   }
@@ -36,10 +41,10 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
   if (response.status === 204) return undefined as T;
 
-  const payload = (await response.json()) as { error?: string } & T;
+  const payload = (await response.json()) as { error?: string; code?: string } & T;
   if (!response.ok) {
     if (response.status === 403 && method !== 'GET') csrfToken = undefined;
-    throw new ApiError(payload.error ?? 'The request could not be completed.', response.status);
+    throw new ApiError(payload.error ?? 'The request could not be completed.', response.status, payload.code, payload);
   }
   return payload;
 }

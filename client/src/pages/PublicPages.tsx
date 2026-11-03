@@ -21,6 +21,7 @@ function EventCard({ event, index, onRegister }: { event: Event; index: number; 
       <h3>{event.event_name}</h3>
       <p><MapPin size={14} /> {event.location}</p>
       <span className="event-full-date"><CalendarDays size={13} /> {date.toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</span>
+      <span className="event-full-date">{event.entry_fee === 0 ? 'Free entry' : `Entry fee ₹${event.entry_fee.toFixed(2)}`} · {event.available_slots} places left</span>
     </div>
     {onRegister && <button className="event-register-link" onClick={onRegister} disabled={!isUpcoming} aria-label={isUpcoming ? `Register for ${event.event_name}` : `${event.event_name} registration is closed`}>
       {isUpcoming ? <ArrowUpRight size={18} /> : <span>Past</span>}
