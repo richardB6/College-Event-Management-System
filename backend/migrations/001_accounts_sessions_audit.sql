@@ -1,0 +1,40 @@
+ALTER TABLE STUDENT ADD COLUMN usn TEXT;
+ALTER TABLE STUDENT ADD COLUMN email TEXT;
+ALTER TABLE STUDENT ADD COLUMN password_hash TEXT;
+ALTER TABLE STUDENT ADD COLUMN account_status TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE STUDENT ADD COLUMN created_at TEXT;
+ALTER TABLE STUDENT ADD COLUMN updated_at TEXT;
+
+UPDATE STUDENT SET created_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP;
+
+CREATE UNIQUE INDEX student_usn_unique ON STUDENT(usn) WHERE usn IS NOT NULL;
+CREATE UNIQUE INDEX student_email_unique ON STUDENT(email) WHERE email IS NOT NULL;
+
+CREATE TABLE ADMINS (
+    admin_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE SESSIONS (
+    session_id TEXT PRIMARY KEY,
+    session_data TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+
+CREATE INDEX sessions_expiry_idx ON SESSIONS(expires_at);
+
+CREATE TABLE AUDIT_LOGS (
+    audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor_id INTEGER NOT NULL,
+    actor_role TEXT NOT NULL CHECK (actor_role IN ('student', 'admin')),
+    action TEXT NOT NULL,
+    resource_type TEXT NOT NULL,
+    resource_id TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX audit_logs_created_at_idx ON AUDIT_LOGS(created_at);
+CREATE INDEX audit_logs_actor_idx ON AUDIT_LOGS(actor_role, actor_id, audit_id);

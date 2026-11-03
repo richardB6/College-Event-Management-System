@@ -3,52 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login — ClubHub</title>
+    <title>Admin sign in — ClubHub</title>
     <link rel="stylesheet" href="style.css">
-    <style>
-        .login-container {
-            max-width: 400px;
-            margin: 100px auto;
-            background: var(--bg-card);
-            padding: 40px;
-            border-radius: var(--radius-lg);
-            border: 1px solid var(--border);
-            box-shadow: var(--shadow-lg);
-            text-align: center;
-        }
-    </style>
 </head>
-<body class="public-layout">
-
+<body class="public-layout login-page">
     <header class="main-navbar">
-        <div class="nav-brand">
-            <div class="nav-brand-icon">🎓</div>
-            ClubHub
-        </div>
-        <nav class="nav-links">
-            <a href="index.html">Home</a>
-            <a href="students.html">Students</a>
-            <a href="registrations.html">Registrations</a>
-        </nav>
+        <a class="nav-brand" href="index.html"><span class="brand-mark">C</span><span>clubhub</span></a>
+        <nav class="nav-links" aria-label="Main navigation"><a href="index.html">Explore</a><a href="students.html">Students</a><a href="registrations.html">Registrations</a></nav>
+        <div class="nav-actions"><button class="theme-toggle" type="button" onclick="toggleTheme()" aria-label="Toggle color theme" title="Toggle theme"><span aria-hidden="true">◐</span></button></div>
     </header>
-
-    <main class="page-content">
-        <div class="login-container">
-            <h2 style="margin-bottom: 8px;">Admin Access</h2>
-            <p style="color: var(--text-secondary); margin-bottom: 24px;">Please enter the password to continue.</p>
-            
+    <main class="login-main">
+        <section class="login-container">
+            <span class="login-mark">C</span>
+            <span class="eyebrow">CAMPUS WORKSPACE</span>
+            <h1>Welcome back</h1>
+            <p>Sign in to manage your campus community.</p>
             <form id="loginForm" onsubmit="handleLogin(event)">
-                <div class="form-group" style="text-align: left; margin-bottom: 20px;">
-                    <label for="adminPassword">Password</label>
-                    <input type="password" id="adminPassword" placeholder="Enter password..." required>
-                </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%;">Login to Admin Panel</button>
+                <div class="form-group"><label for="adminPassword">Admin password</label><input type="password" id="adminPassword" placeholder="Enter your password" autocomplete="current-password" required></div>
+                <button type="submit" class="btn btn-primary login-submit">Sign in <span aria-hidden="true">→</span></button>
             </form>
-            <p style="margin-top: 15px; font-size: 0.8rem; color: var(--text-muted);">Hint: The password is <strong>admin123</strong></p>
-        </div>
+            <a class="login-back" href="index.html">← Back to ClubHub</a>
+        </section>
     </main>
-
-    <div class="toast-container" id="toastContainer"></div>
+    <div class="toast-container" id="toastContainer" aria-live="polite"></div>
     <script src="app.js"></script>
 </body>
 </html>

@@ -3,136 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Admin Dashboard — Club Management System">
-    <title>Admin Dashboard — ClubHub</title>
+    <meta name="description" content="ClubHub administration dashboard">
+    <title>Overview — ClubHub</title>
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
-
-    <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">☰</button>
-
+<body class="admin-layout">
+    <button class="sidebar-toggle" id="sidebarToggle" type="button" onclick="toggleSidebar()" aria-label="Toggle navigation">☰</button>
     <aside class="sidebar" id="sidebar">
-        <div class="sidebar-brand">
-            <div class="brand-icon">🛡️</div>
-            <div>
-                <h2>Admin Panel</h2>
-                <span>ClubHub System</span>
-            </div>
-        </div>
-        <nav class="sidebar-nav">
-            <a href="admin.html" class="active">
-                <span class="nav-icon">📊</span> Dashboard
-            </a>
-            <a href="admin-clubs.html">
-                <span class="nav-icon">🏛️</span> Manage Clubs
-            </a>
-            <a href="admin-events.html">
-                <span class="nav-icon">🎉</span> Manage Events
-            </a>
+        <a class="sidebar-brand" href="admin.html"><span class="brand-mark">C</span><span class="brand-copy"><strong>clubhub</strong><small>Campus workspace</small></span></a>
+        <div class="sidebar-label">WORKSPACE</div>
+        <nav class="sidebar-nav" aria-label="Admin navigation">
+            <a href="admin.html" class="active"><span class="nav-icon">◫</span>Overview</a>
+            <a href="admin-clubs.html"><span class="nav-icon">◇</span>Clubs</a>
+            <a href="admin-events.html"><span class="nav-icon">▦</span>Events</a>
+            <a href="students.html"><span class="nav-icon">○</span>Students</a>
+            <a href="registrations.html"><span class="nav-icon">↗</span>Registrations</a>
         </nav>
+        <div class="sidebar-spacer"></div>
         <div class="sidebar-footer">
-            <a href="index.html" style="color: var(--text-muted); display: block; margin-bottom: 12px;">← Back to Main Site</a>
-            <button onclick="logoutAdmin()" class="btn btn-secondary btn-sm" style="width: 100%;">🚪 Logout</button>
+            <a href="index.html" class="sidebar-site-link"><span>↗</span> View campus site</a>
+            <button onclick="logoutAdmin()" class="btn btn-secondary btn-sm sidebar-logout">Sign out</button>
         </div>
     </aside>
-
     <main class="main-content">
         <header class="top-header">
-            <div>
-                <h1>Admin Dashboard</h1>
-                <p class="header-subtitle">Overview of system operations</p>
-            </div>
-            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">🌓</button>
+            <div class="page-heading"><span class="eyebrow">CAMPUS WORKSPACE</span><h1>Overview</h1><p class="header-subtitle">A clear view of your campus community.</p></div>
+            <button class="theme-toggle" type="button" onclick="toggleTheme()" aria-label="Toggle color theme" title="Toggle theme"><span aria-hidden="true">◐</span></button>
         </header>
-
         <div class="page-content">
-            <div class="dashboard-grid">
-                <div class="stat-card">
-                    <div class="stat-icon purple">👩‍🎓</div>
-                    <div class="stat-info">
-                        <h3 id="studentCount">—</h3>
-                        <p>Total Students</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon green">🏛️</div>
-                    <div class="stat-info">
-                        <h3 id="clubCount">—</h3>
-                        <p>Active Clubs</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon yellow">🎉</div>
-                    <div class="stat-info">
-                        <h3 id="eventCount">—</h3>
-                        <p>Upcoming Events</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon blue">📝</div>
-                    <div class="stat-info">
-                        <h3 id="regCount">—</h3>
-                        <p>Registrations</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="section-panel">
-                <div class="section-header">
-                    <h2><span class="icon">👩‍🎓</span> Recent Students</h2>
-                </div>
-                <div class="section-body">
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Name</th>
-                                    <th>Year</th>
-                                    <th>Branch</th>
-                                </tr>
-                            </thead>
-                            <tbody id="recentStudentsBody">
-                                <tr><td colspan="4" class="empty-state"><p>Loading...</p></td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <div class="section-panel">
-                <div class="section-header">
-                    <h2><span class="icon">🎉</span> Recent Events</h2>
-                </div>
-                <div class="section-body">
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Event Name</th>
-                                    <th>Date</th>
-                                    <th>Location</th>
-                                    <th>Club</th>
-                                </tr>
-                            </thead>
-                            <tbody id="recentEventsBody">
-                                <tr><td colspan="5" class="empty-state"><p>Loading...</p></td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+            <section class="dashboard-grid" aria-label="Live campus totals">
+                <article class="stat-card"><div class="stat-top"><span class="stat-icon stat-violet">○</span><span class="stat-label">COMMUNITY</span></div><strong id="studentCount">—</strong><p>Students</p></article>
+                <article class="stat-card"><div class="stat-top"><span class="stat-icon stat-blue">◇</span><span class="stat-label">GET INVOLVED</span></div><strong id="clubCount">—</strong><p>Active clubs</p></article>
+                <article class="stat-card"><div class="stat-top"><span class="stat-icon stat-amber">▦</span><span class="stat-label">ON THE CALENDAR</span></div><strong id="eventCount">—</strong><p>Events</p></article>
+                <article class="stat-card"><div class="stat-top"><span class="stat-icon stat-green">↗</span><span class="stat-label">PARTICIPATION</span></div><strong id="regCount">—</strong><p>Registrations</p></article>
+            </section>
+            <section class="quick-actions" aria-label="Quick actions">
+                <div><span class="eyebrow">QUICK ACTIONS</span><h2>Keep things moving</h2></div>
+                <a class="quick-action" href="admin-clubs.html"><span class="quick-action-icon">＋</span><span><strong>Add a club</strong><small>Grow your campus community</small></span><b>→</b></a>
+                <a class="quick-action" href="admin-events.html"><span class="quick-action-icon">＋</span><span><strong>Schedule an event</strong><small>Put something on the calendar</small></span><b>→</b></a>
+            </section>
+            <section class="section-panel">
+                <div class="section-header"><div><span class="eyebrow">CAMPUS COMMUNITY</span><h2>Recently added students</h2></div><a class="text-link" href="students.html">View all <span aria-hidden="true">→</span></a></div>
+                <div class="table-container"><table><thead><tr><th>Student</th><th>Year</th><th>Branch</th></tr></thead><tbody id="recentStudentsBody"><tr><td colspan="3" class="empty-state">Loading students…</td></tr></tbody></table></div>
+            </section>
+            <section class="section-panel">
+                <div class="section-header"><div><span class="eyebrow">WHAT'S HAPPENING</span><h2>Recently added events</h2></div><a class="text-link" href="admin-events.html">Manage events <span aria-hidden="true">→</span></a></div>
+                <div class="table-container"><table><thead><tr><th>Event</th><th>Date</th><th>Location</th><th>Club</th></tr></thead><tbody id="recentEventsBody"><tr><td colspan="4" class="empty-state">Loading events…</td></tr></tbody></table></div>
+            </section>
         </div>
     </main>
-
-    <div class="toast-container" id="toastContainer"></div>
-
+    <div class="toast-container" id="toastContainer" aria-live="polite"></div>
     <script src="app.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            loadDashboard();
-        });
-    </script>
+    <script>document.addEventListener('DOMContentLoaded', loadDashboard);</script>
 </body>
 </html>

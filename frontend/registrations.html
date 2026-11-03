@@ -7,96 +7,37 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="public-layout">
-
     <header class="main-navbar">
-        <div class="nav-brand">
-            <div class="nav-brand-icon">🎓</div>
-            ClubHub
-        </div>
-        <nav class="nav-links">
-            <a href="index.html">Home</a>
-            <a href="students.html">Students</a>
-            <a href="registrations.html" class="active">Registrations</a>
-        </nav>
-        <div style="display: flex; gap: 12px; align-items: center;">
-            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">🌓</button>
-            <a href="admin-login.html" class="btn btn-secondary btn-sm">🛡️ Admin Panel</a>
-        </div>
+        <a class="nav-brand" href="index.html"><span class="brand-mark">C</span><span>clubhub</span></a>
+        <nav class="nav-links" aria-label="Main navigation"><a href="index.html">Explore</a><a href="students.html">Students</a><a href="registrations.html" class="active">Registrations</a></nav>
+        <div class="nav-actions"><button class="theme-toggle" type="button" onclick="toggleTheme()" aria-label="Toggle color theme" title="Toggle theme"><span aria-hidden="true">◐</span></button><a href="admin-login.html" class="btn btn-secondary btn-sm">Admin sign in</a></div>
     </header>
-
-    <main class="page-content" style="max-width: 1200px; margin: 0 auto; padding: 40px 20px;">
-        <header style="margin-bottom: 30px;">
-            <h1 style="font-size: 2rem; margin-bottom: 8px;">Event Registrations</h1>
-            <p style="color: var(--text-secondary);">Register students for upcoming club events.</p>
-        </header>
-
-        <!-- Registration Form -->
-        <div class="section-panel">
-            <div class="section-header">
-                <h2><span class="icon">➕</span> New Registration</h2>
-            </div>
+    <main class="public-content">
+        <header class="public-page-heading"><span class="eyebrow">SHOW UP FOR WHAT YOU LOVE</span><h1>Event registrations</h1><p>Find your next campus moment and make it official.</p></header>
+        <section class="section-panel form-panel">
+            <div class="section-header"><div><span class="eyebrow">SAVE YOUR PLACE</span><h2>New registration</h2></div></div>
             <div class="section-body">
                 <form id="registrationForm" onsubmit="handleRegistrationSubmit(event)">
                     <div class="form-grid">
-                        <div class="form-group">
-                            <label for="regStudentId">Student</label>
-                            <select id="regStudentId" required>
-                                <option value="">— Select Student —</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="regEventId">Event</label>
-                            <select id="regEventId" required>
-                                <option value="">— Select Event —</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="regEntryFee">Entry Fee (₹)</label>
-                            <input type="number" id="regEntryFee" placeholder="e.g. 200" min="0" step="0.01" required>
-                        </div>
+                        <div class="form-group"><label for="regStudentId">Student</label><select id="regStudentId" required><option value="">Select a student</option></select></div>
+                        <div class="form-group"><label for="regEventId">Event</label><select id="regEventId" required><option value="">Select an event</option></select></div>
+                        <div class="form-group"><label for="regEntryFee">Entry fee (₹)</label><input type="number" id="regEntryFee" placeholder="0.00" min="0" step="0.01" required></div>
                     </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">📝 Register</button>
-                    </div>
+                    <div class="form-actions"><button type="submit" class="btn btn-primary">Register for event <span aria-hidden="true">→</span></button></div>
                 </form>
             </div>
-        </div>
-
-        <!-- Registrations Table -->
-        <div class="section-panel">
-            <div class="section-header">
-                <h2><span class="icon">📋</span> All Registrations</h2>
+        </section>
+        <section class="section-panel">
+            <div class="section-header section-header-tools">
+                <div><span class="eyebrow">YOUR CAMPUS ACTIVITY</span><h2>All registrations</h2></div>
+                <label class="search-field"><span aria-hidden="true">⌕</span><input id="registrationSearch" type="search" placeholder="Search registrations…" aria-label="Search registrations" oninput="filterTable('registrationSearch','registrationsTableBody')"></label>
             </div>
-            <div class="section-body">
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Reg ID</th>
-                                <th>Student Name</th>
-                                <th>Event Name</th>
-                                <th>Club Name</th>
-                                <th>Entry Fee</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="registrationsTableBody">
-                            <tr><td colspan="6" class="empty-state"><p>Loading...</p></td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+            <div class="table-container"><table><thead><tr><th>Student</th><th>Event</th><th>Club</th><th>Entry fee</th><th>Actions</th></tr></thead><tbody id="registrationsTableBody"><tr><td colspan="5" class="empty-state">Loading registrations…</td></tr></tbody></table></div>
+        </section>
     </main>
-
-    <div class="toast-container" id="toastContainer"></div>
+    <footer class="public-footer"><span>clubhub</span><span>Made for campus life.</span><a href="index.html">Explore communities →</a></footer>
+    <div class="toast-container" id="toastContainer" aria-live="polite"></div>
     <script src="app.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            loadRegistrations();
-            loadStudentsDropdown();
-            loadEventsDropdown();
-        });
-    </script>
+    <script>document.addEventListener('DOMContentLoaded', () => { loadRegistrations(); loadStudentsDropdown(); loadEventsDropdown(); });</script>
 </body>
 </html>

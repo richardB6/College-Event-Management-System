@@ -7,96 +7,39 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="public-layout">
-
     <header class="main-navbar">
-        <div class="nav-brand">
-            <div class="nav-brand-icon">🎓</div>
-            ClubHub
-        </div>
-        <nav class="nav-links">
-            <a href="index.html">Home</a>
-            <a href="students.html" class="active">Students</a>
-            <a href="registrations.html">Registrations</a>
-        </nav>
-        <div style="display: flex; gap: 12px; align-items: center;">
-            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">🌓</button>
-            <a href="admin-login.html" class="btn btn-secondary btn-sm">🛡️ Admin Panel</a>
-        </div>
+        <a class="nav-brand" href="index.html"><span class="brand-mark">C</span><span>clubhub</span></a>
+        <nav class="nav-links" aria-label="Main navigation"><a href="index.html">Explore</a><a href="students.html" class="active">Students</a><a href="registrations.html">Registrations</a></nav>
+        <div class="nav-actions"><button class="theme-toggle" type="button" onclick="toggleTheme()" aria-label="Toggle color theme" title="Toggle theme"><span aria-hidden="true">◐</span></button><a href="admin-login.html" class="btn btn-secondary btn-sm">Admin sign in</a></div>
     </header>
-
-    <main class="page-content" style="max-width: 1200px; margin: 0 auto; padding: 40px 20px;">
-        <header style="margin-bottom: 30px;">
-            <h1 style="font-size: 2rem; margin-bottom: 8px;">Students</h1>
-            <p style="color: var(--text-secondary);">Manage and view all registered students.</p>
-        </header>
-
-        <!-- Add / Edit Form -->
-        <div class="section-panel">
-            <div class="section-header">
-                <h2 id="studentFormTitle"><span class="icon">➕</span> Add New Student</h2>
-            </div>
+    <main class="public-content">
+        <header class="public-page-heading"><span class="eyebrow">THE PEOPLE MAKE THE PLACE</span><h1>Student directory</h1><p>Meet the people learning, creating, and building community across campus.</p></header>
+        <section class="section-panel form-panel">
+            <div class="section-header"><div><span class="eyebrow">CAMPUS COMMUNITY</span><h2 id="studentFormTitle">Add a student</h2></div></div>
             <div class="section-body">
                 <form id="studentForm" onsubmit="handleStudentSubmit(event)">
                     <input type="hidden" id="editStudentId">
                     <div class="form-grid">
-                        <div class="form-group">
-                            <label for="studentFname">First Name</label>
-                            <input type="text" id="studentFname" placeholder="e.g. Aarav" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="studentLname">Last Name</label>
-                            <input type="text" id="studentLname" placeholder="e.g. Sharma" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="studentYear">Year</label>
-                            <input type="number" id="studentYear" placeholder="e.g. 2" min="1" max="6" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="studentBranch">Branch</label>
-                            <input type="text" id="studentBranch" placeholder="e.g. Computer Science" required>
-                        </div>
+                        <div class="form-group"><label for="studentFname">First name</label><input type="text" id="studentFname" placeholder="e.g. Aarav" required></div>
+                        <div class="form-group"><label for="studentLname">Last name</label><input type="text" id="studentLname" placeholder="e.g. Sharma" required></div>
+                        <div class="form-group"><label for="studentYear">Year of study</label><input type="number" id="studentYear" placeholder="e.g. 2" min="1" max="6" required></div>
+                        <div class="form-group"><label for="studentBranch">Branch</label><input type="text" id="studentBranch" placeholder="e.g. Computer Science" required></div>
                     </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-primary" id="studentSubmitBtn">➕ Add Student</button>
-                        <button type="button" class="btn btn-secondary" id="studentCancelBtn" onclick="cancelStudentEdit()" style="display:none;">✕ Cancel</button>
-                    </div>
+                    <div class="form-actions"><button type="submit" class="btn btn-primary" id="studentSubmitBtn">Add student <span aria-hidden="true">＋</span></button><button type="button" class="btn btn-secondary" id="studentCancelBtn" onclick="cancelStudentEdit()" hidden>Cancel</button></div>
                 </form>
             </div>
-        </div>
-
-        <!-- Students Table -->
-        <div class="section-panel">
-            <div class="section-header">
-                <h2><span class="icon">📋</span> All Students</h2>
+        </section>
+        <section class="section-panel">
+            <div class="section-header section-header-tools">
+                <div><span class="eyebrow">DIRECTORY</span><h2>All students</h2></div>
+                <label class="search-field"><span aria-hidden="true">⌕</span><input id="studentSearch" type="search" placeholder="Search students…" aria-label="Search students" oninput="filterTable('studentSearch','studentsTableBody')"></label>
             </div>
-            <div class="section-body">
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>First Name</th>
-                                <th>Last Name</th>
-                                <th>Year</th>
-                                <th>Branch</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="studentsTableBody">
-                            <tr><td colspan="6" class="empty-state"><p>Loading...</p></td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+            <div class="table-container"><table><thead><tr><th>Student</th><th>Year</th><th>Branch</th><th>Actions</th></tr></thead><tbody id="studentsTableBody"><tr><td colspan="4" class="empty-state">Loading students…</td></tr></tbody></table></div>
+        </section>
     </main>
-
-    <div class="toast-container" id="toastContainer"></div>
+    <footer class="public-footer"><span>clubhub</span><span>Made for campus life.</span><a href="index.html">Explore communities →</a></footer>
+    <div class="toast-container" id="toastContainer" aria-live="polite"></div>
     <script src="app.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            loadStudents();
-        });
-    </script>
+    <script>document.addEventListener('DOMContentLoaded', loadStudents);</script>
 </body>
 </html>

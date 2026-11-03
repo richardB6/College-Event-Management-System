@@ -3,39 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ClubHub — Home</title>
+    <meta name="description" content="Find your community, discover campus events, and make the most of college life with ClubHub.">
+    <title>ClubHub — Find your people</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://images.unsplash.com">
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="public-layout">
-
+<body class="public-layout home-page">
     <header class="main-navbar">
-        <div class="nav-brand">
-            <div class="nav-brand-icon">🎓</div>
-            ClubHub
-        </div>
-        <nav class="nav-links">
-            <a href="index.html" class="active">Home</a>
+        <a class="nav-brand" href="index.html" aria-label="ClubHub home">
+            <span class="brand-mark">C</span><span>clubhub</span>
+        </a>
+        <nav class="nav-links" aria-label="Main navigation">
+            <a href="index.html" class="active">Explore</a>
             <a href="students.html">Students</a>
             <a href="registrations.html">Registrations</a>
         </nav>
-        <div style="display: flex; gap: 12px; align-items: center;">
-            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">🌓</button>
-            <a href="admin-login.html" class="btn btn-secondary btn-sm">🛡️ Admin Panel</a>
+        <div class="nav-actions">
+            <button class="theme-toggle" type="button" onclick="toggleTheme()" aria-label="Toggle color theme" title="Toggle theme"><span aria-hidden="true">◐</span></button>
+            <a href="admin-login.html" class="btn btn-secondary btn-sm">Admin sign in</a>
         </div>
     </header>
 
-    <main style="padding: 60px 48px; text-align: center; max-width: 800px; margin: 0 auto;">
-        <h1 style="font-size: 3rem; margin-bottom: 20px;">Welcome to ClubHub</h1>
-        <p style="font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 40px;">
-            Your one-stop platform for managing student records and registering for exciting club events.
-        </p>
-        
-        <div style="display: flex; gap: 20px; justify-content: center;">
-            <a href="students.html" class="btn btn-primary" style="padding: 14px 28px; font-size: 1rem;">View Students</a>
-            <a href="registrations.html" class="btn btn-secondary" style="padding: 14px 28px; font-size: 1rem;">Register for Event</a>
-        </div>
+    <main>
+        <section class="hero-shell">
+            <div class="hero-copy">
+                <span class="eyebrow"><span class="eyebrow-dot"></span> CAMPUS LIFE, CONNECTED</span>
+                <h1>Find your people.<br><span>Find your place.</span></h1>
+                <p class="hero-description">The best of college happens beyond the classroom. Discover communities, show up for what you love, and make this year count.</p>
+                <div class="hero-actions">
+                    <a href="#clubs" class="btn btn-primary">Explore clubs <span aria-hidden="true">↗</span></a>
+                    <a href="registrations.html" class="btn btn-text">Browse events <span aria-hidden="true">→</span></a>
+                </div>
+                <div class="hero-note"><span class="avatar-stack" aria-hidden="true"><i>✦</i><i>◈</i><i>●</i></span><span>One campus. Countless ways to belong.</span></div>
+            </div>
+            <div class="hero-visual">
+                <img src="https://images.unsplash.com/photo-1523580494863-6f3031224c94?auto=format&fit=crop&w=1200&q=85" alt="University students gathering on campus">
+                <div class="hero-image-shade"></div>
+                <div class="hero-caption"><span class="caption-icon">✳</span><span><strong>Make room for more</strong><small>Your next favorite thing starts here.</small></span></div>
+                <span class="hero-orbit orbit-one" aria-hidden="true"></span>
+                <span class="hero-orbit orbit-two" aria-hidden="true"></span>
+            </div>
+        </section>
+
+        <section class="community-strip" aria-label="Campus community">
+            <div class="community-intro"><span class="eyebrow">A CAMPUS FULL OF POSSIBILITY</span><p>There's a place for every side of you.</p></div>
+            <div class="community-stats">
+                <div><strong id="publicClubCount">—</strong><span>communities</span></div>
+                <div><strong id="publicEventCount">—</strong><span>events in the calendar</span></div>
+                <div><strong id="publicStudentCount">—</strong><span>students on campus</span></div>
+            </div>
+        </section>
+
+        <section class="content-section" id="clubs">
+            <div class="section-heading">
+                <div><span class="eyebrow">YOUR PEOPLE ARE HERE</span><h2>Explore the community</h2><p>Find a club that feels like you—or introduces you to something new.</p></div>
+                <a class="text-link" href="students.html">Meet the community <span aria-hidden="true">→</span></a>
+            </div>
+            <div class="club-grid" id="featuredClubs">
+                <div class="loading-card"><span class="skeleton skeleton-wide"></span><span class="skeleton"></span></div>
+                <div class="loading-card"><span class="skeleton skeleton-wide"></span><span class="skeleton"></span></div>
+                <div class="loading-card"><span class="skeleton skeleton-wide"></span><span class="skeleton"></span></div>
+            </div>
+        </section>
+
+        <section class="events-section" id="events">
+            <div class="content-section">
+                <div class="section-heading">
+                    <div><span class="eyebrow">SAVE THE DATE</span><h2>Coming up on campus</h2><p>Good things happen when you put them on the calendar.</p></div>
+                    <a class="text-link" href="registrations.html">All registrations <span aria-hidden="true">→</span></a>
+                </div>
+                <div class="event-grid" id="upcomingEvents">
+                    <div class="loading-card"><span class="skeleton skeleton-wide"></span><span class="skeleton"></span></div>
+                    <div class="loading-card"><span class="skeleton skeleton-wide"></span><span class="skeleton"></span></div>
+                    <div class="loading-card"><span class="skeleton skeleton-wide"></span><span class="skeleton"></span></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="closing-cta">
+            <div><span class="eyebrow">YOUR NEXT CHAPTER STARTS HERE</span><h2>Make college more than a timetable.</h2><p>Find an event, meet your community, and see where it takes you.</p></div>
+            <a class="btn btn-light" href="registrations.html">Find your next event <span aria-hidden="true">→</span></a>
+        </section>
     </main>
 
+    <footer class="site-footer">
+        <a class="nav-brand" href="index.html"><span class="brand-mark">C</span><span>clubhub</span></a>
+        <p>Made for campus life.</p>
+        <div><a href="students.html">Students</a><a href="registrations.html">Events</a><a href="admin-login.html">Admin</a></div>
+        <span class="footer-copyright">© ClubHub</span>
+    </footer>
+    <div class="toast-container" id="toastContainer" aria-live="polite"></div>
     <script src="app.js"></script>
+    <script>document.addEventListener('DOMContentLoaded', loadPublicHome);</script>
 </body>
 </html>

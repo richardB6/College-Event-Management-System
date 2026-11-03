@@ -1,62 +1,78 @@
-# College Event Management System
+# ClubHub
 
-ClubHub is a small web application for managing college clubs, events, students, and event registrations. It includes a Node.js/Express API, a SQLite database, and a static HTML/CSS/JavaScript frontend.
+ClubHub brings campus clubs, events, and student registrations into one university platform. The application has a public discovery experience, a student portal, and a role-protected administration workspace.
 
-## Features
+## Stack
 
-- View and manage students, clubs, and events
-- Register students for events and manage registrations
-- Admin dashboard with summary counts
-- SQLite database initialized automatically by the backend
-
-## Requirements
-
-- Node.js 20 or later
-- npm
+- **Frontend:** React, TypeScript, Vite, Tailwind CSS, React Router, TanStack Query, React Hook Form, Zod, and Recharts
+- **Backend:** Node.js, Express, SQLite, bcrypt password hashing, and persistent HTTP-only sessions
+- **Database:** SQLite with versioned, additive migrations
 
 ## Run locally
 
-1. Open a terminal in the `backend` directory.
-2. Install dependencies:
+Requirements: Node.js 20+ and npm.
+
+1. Install backend dependencies:
 
    ```sh
+   cd backend
    npm install
    ```
 
-3. Optionally copy `.env.example` to `.env` and set `PORT` if you want to use a port other than `3000`.
+2. Create `backend/.env` from `.env.example`. Set a private session secret (at least 32 characters in production), and adjust `PORT`, `NODE_ENV`, or `USN_PATTERN` if needed. Do not commit `.env`.
+3. Install frontend dependencies and build the production UI:
+
+   ```sh
+   cd ../client
+   npm install
+   npm run build
+   ```
+
+   Vite writes the build to `frontend/dist`, which is ignored by Git.
 4. Start the server:
 
    ```sh
+   cd ../backend
    npm start
    ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in a browser. The backend serves the frontend and API from the same origin.
+5. Open [http://localhost:3000](http://localhost:3000).
 
-The SQLite database is created at `database/club_management.db` when the backend starts. It is intentionally excluded from Git so local student records are not published. On a new setup, the backend creates the tables and inserts sample data if the student table is empty.
+For frontend development with hot reload, run `npm run dev` from `client` in a second terminal. The Vite development server proxies `/api` requests to the backend on port 3000.
 
-## API
+## Accounts and access
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET, POST | `/api/students` | List or add students |
-| PUT, DELETE | `/api/students/:id` | Update or remove a student |
-| GET, POST | `/api/clubs` | List or add clubs |
-| PUT, DELETE | `/api/clubs/:id` | Update or remove a club |
-| GET, POST | `/api/events` | List or add events |
-| PUT, DELETE | `/api/events/:id` | Update or remove an event |
-| GET, POST | `/api/registrations` | List or add registrations |
-| DELETE | `/api/registrations/:id` | Remove a registration |
-| GET | `/api/dashboard` | Get dashboard totals |
-| POST | `/api/login` | Demo admin login |
+- Students create their own account from **Student sign in → Create your student account**. Signup creates a new student record; legacy directory rows are not automatically claimed or assigned credentials.
+- Student USNs follow `^2BU[0-9]{2}[A-Z]{2}[0-9]{3}$` by default. Configure a different regular expression with `USN_PATTERN`. Matching this format does **not** verify university enrollment.
+- Administrator signup is not public. Provision the first administrator interactively from `backend` with `npm run admin:create`.
+- Sessions are stored in SQLite and use HTTP-only, SameSite Strict cookies. State-changing API calls require a CSRF token. Student profile and registration records are restricted to the signed-in student and authorized administrators.
+
+## Database and migrations
+
+The database is `database/club_management.db`. On startup, the backend applies versioned migrations under `backend/migrations/`. The account/session/audit migration adds authentication fields and tables without deleting or rewriting existing club, event, registration, or student records. Existing students remain without accounts until separately registered.
+
+Back up the database before deploying an application update that runs migrations. The backend seeds the sample campus records only when the student table is empty.
+
+## Tests
+
+Run the backend integration tests against isolated in-memory SQLite databases:
+
+```sh
+cd backend
+npm test
+```
+
+Run the frontend tests and production type-check/build:
+
+```sh
+cd client
+npm test
+npm run build
+```
 
 ## Project layout
 
-- `backend/` — Express API, SQLite setup, and npm configuration
-- `database/schema.sql` — MySQL schema and example seed statements
-- `frontend/` — Static web pages, styles, and browser-side code
-
-The running application uses SQLite and initializes its schema in `backend/db.js`. `database/schema.sql` is a separate MySQL schema/reference script.
-
-## Security note
-
-This is a demo project, not production-ready authentication. The admin password is hard-coded and shown in the demo login page. Do not deploy it publicly or use real student information without replacing the authentication and adding appropriate access controls.
+- `backend/` — Express API, SQLite initialization and migrations, session store, and administrator provisioning
+- `client/` — React application, role-based pages, shared UI, and frontend tests
+- `frontend/` — legacy static-page sources plus the generated `dist/` production bundle
+- `database/` — local SQLite database and the separate schema reference
