@@ -22,7 +22,7 @@ export interface Student {
   department_name: string | null;
   account_status: string;
   has_account: boolean;
-  created_at: string;
+  created_at: string | null;
 }
 
 export interface Club {
