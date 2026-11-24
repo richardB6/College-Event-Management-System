@@ -1,5 +1,8 @@
 const crypto = require('crypto');
+const fs = require('fs');
 const express = require('express');
+const path = require('path');
+const multer = require('multer');
 const session = require('express-session');
 const { rateLimit } = require('express-rate-limit');
 const helmet = require('helmet');
@@ -114,6 +117,17 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
 
     const app = express();
     const registrationService = createRegistrationService(db);
+    const clubImageDirectory = path.join(__dirname, 'uploads', 'clubs');
+    const clubImageUpload = multer({
+        storage: multer.memoryStorage(),
+        limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+        fileFilter: (_req, file, callback) => {
+            if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
+                return callback(new HttpError(400, 'Upload a JPEG, PNG, or WebP image.'));
+            }
+            callback(null, true);
+        },
+    });
     const usnRegex = parseUsnPattern(usnPattern);
     const effectiveSessionSecret = sessionSecret || crypto.randomBytes(32).toString('hex');
     const sessionStore = new SQLiteSessionStore(db);
@@ -154,6 +168,11 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
             path: '/',
         },
     }));
+    app.use('/uploads/clubs', express.static(clubImageDirectory, {
+        fallthrough: false,
+        immutable: true,
+        maxAge: production ? '1h' : 0,
+    }));
 
     const authLimiter = rateLimit({
         windowMs: 15 * 60 * 1000,
@@ -183,8 +202,24 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
         allow_conflicts: z.boolean().optional().default(false),
         entry_fee: z.coerce.number().finite().min(0).max(100000).optional(),
     });
+    const clubImagePathSchema = z.union([
+        z.string().regex(/^\/uploads\/clubs\/[a-f0-9-]+\.(?:jpg|png|webp)$/),
+        z.null(),
+    ]).optional();
     const clubSchema = z.object({
-        club_name: z.string().trim().min(1).max(100),
+        club_name: z.string().trim().min(1, 'Enter a club name.').max(100),
+        description: z.string().trim().min(1, 'Enter a club description.').max(5000),
+        category: z.string().trim().min(1, 'Choose a club category.').max(80),
+        founding_year: z.union([z.coerce.number().int().min(1800).max(new Date().getFullYear()), z.null()]).optional(),
+        founder_name: z.string().trim().max(120).optional(),
+        president_name: z.string().trim().min(1, 'Enter the current president name.').max(120),
+        president_email: z.string().trim().email('Enter a valid president email.').max(254),
+        president_phone: z.string().trim().min(5, 'Enter a president phone number.').max(30),
+        mission: z.string().trim().max(5000).optional(),
+        contact_email: z.union([z.string().trim().email().max(254), z.literal('')]).optional(),
+        contact_phone: z.string().trim().max(30).optional(),
+        logo_path: clubImagePathSchema,
+        banner_path: clubImagePathSchema,
     });
     const localDateTimeSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/)
         .refine(value => isValidDate(value.slice(0, 10)) && isValidTime(value.slice(11)), 'Use a valid local date and time.');
@@ -476,7 +511,18 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
         res.status(204).end();
     }));
 
-    const publicClubQuery = 'SELECT club_id, club_name FROM CLUB ORDER BY club_name COLLATE NOCASE';
+    const publicClubQuery = `
+        SELECT c.*,
+            (SELECT COUNT(*) FROM CLUB_MEMBERSHIPS m
+             WHERE m.club_id = c.club_id AND m.status = 'active') AS active_member_count,
+            (SELECT COUNT(*) FROM EVENT e
+             WHERE e.club_id = c.club_id AND e.status != 'draft') AS event_count,
+            EXISTS (
+                SELECT 1 FROM EVENT e
+                WHERE e.club_id = c.club_id AND e.status = 'published' AND e.event_date >= date('now')
+            ) AS has_upcoming_events
+        FROM CLUB c ORDER BY c.club_name COLLATE NOCASE
+    `;
     const publicEventsQuery = `
         SELECT e.*, c.club_name, event_organizer.email AS organizer_email,
             (SELECT COUNT(*) FROM REGISTRATION r
@@ -486,19 +532,140 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
         FROM EVENT e JOIN CLUB c ON c.club_id = e.club_id
         LEFT JOIN ADMINS event_organizer ON event_organizer.admin_id = e.organizer_id
     `;
+    function processOpenEventAnnouncements(now = new Date()) {
+        const events = db.prepare(`
+            SELECT e.*, c.club_name,
+                (SELECT COUNT(*) FROM REGISTRATION r
+                 WHERE r.event_id = e.event_id AND r.status IN ('confirmed', 'promotion_pending')) AS confirmed_count
+            FROM EVENT e JOIN CLUB c ON c.club_id = e.club_id
+        `).all();
+        for (const event of events) {
+            const lifecycle = getEventLifecycleStatus(event, event.confirmed_count, now);
+            const registrationOpen = ['registration_open', 'full'].includes(lifecycle);
+            const update = db.transaction(() => {
+                const state = db.prepare('SELECT registration_open, occurrence FROM EVENT_NOTIFICATION_STATE WHERE event_id = ?')
+                    .get(event.event_id);
+                if (!registrationOpen) {
+                    if (state?.registration_open) {
+                        db.prepare(`
+                            UPDATE EVENT_NOTIFICATION_STATE
+                            SET registration_open = 0, updated_at = CURRENT_TIMESTAMP
+                            WHERE event_id = ?
+                        `).run(event.event_id);
+                    } else if (!state) {
+                        db.prepare(`
+                            INSERT INTO EVENT_NOTIFICATION_STATE (event_id, registration_open, occurrence)
+                            VALUES (?, 0, 0)
+                        `).run(event.event_id);
+                    }
+                    return;
+                }
+                if (state?.registration_open) return;
+                const occurrence = (state?.occurrence ?? 0) + 1;
+                db.prepare(`
+                    INSERT INTO EVENT_NOTIFICATION_STATE (event_id, registration_open, occurrence)
+                    VALUES (?, 1, ?)
+                    ON CONFLICT(event_id) DO UPDATE SET registration_open = 1, occurrence = excluded.occurrence,
+                        updated_at = CURRENT_TIMESTAMP
+                `).run(event.event_id, occurrence);
+                const students = db.prepare(`
+                    SELECT s.student_id,
+                        EXISTS (
+                            SELECT 1 FROM CLUB_MEMBERSHIPS m
+                            WHERE m.student_id = s.student_id AND m.club_id = ? AND m.status = 'active'
+                        ) AS is_member
+                    FROM STUDENT s
+                    WHERE s.account_status = 'active' AND s.password_hash IS NOT NULL
+                `).all(event.club_id);
+                for (const student of students) {
+                    const availability = lifecycle === 'full' ? 'The event is full; join the waitlist.' : 'Registrations are now open.';
+                    createNotification(db, {
+                        recipientRole: 'student',
+                        recipientId: student.student_id,
+                        type: 'event_announcement',
+                        category: 'event_announcements',
+                        message: student.is_member
+                            ? `${event.club_name} is organizing ${event.event_name}! ${availability} Secure your spot.`
+                            : `New campus event: ${event.event_name} by ${event.club_name}. ${availability}`,
+                        eventId: event.event_id,
+                        clubId: event.club_id,
+                        link: `/events/${event.event_id}`,
+                        dedupeKey: `event-opening:${event.event_id}:${occurrence}:${student.student_id}`,
+                    });
+                }
+            });
+            update.immediate();
+        }
+    }
+
+    function processDueEventReminders(now = new Date()) {
+        const registrations = db.prepare(`
+            SELECT r.reg_id, r.student_id, e.event_id, e.event_name, e.event_date, e.start_time, e.timezone
+            FROM REGISTRATION r
+            JOIN EVENT e ON e.event_id = r.event_id
+            JOIN STUDENT s ON s.student_id = r.student_id
+            WHERE r.status = 'confirmed' AND e.status = 'published'
+              AND s.account_status = 'active' AND s.password_hash IS NOT NULL
+        `).all();
+        const nowEpoch = now.getTime();
+        for (const registration of registrations) {
+            const eventStart = dateTimeToEpoch(
+                asLocalDateTime(registration.event_date, registration.start_time),
+                registration.timezone || 'Asia/Kolkata',
+            );
+            if (eventStart <= nowEpoch || eventStart - nowEpoch > 24 * 60 * 60 * 1000) continue;
+            const startTime = new Intl.DateTimeFormat('en-IN', {
+                timeZone: registration.timezone || 'Asia/Kolkata',
+                hour: 'numeric',
+                minute: '2-digit',
+            }).format(new Date(eventStart));
+            createNotification(db, {
+                recipientRole: 'student',
+                recipientId: registration.student_id,
+                type: 'event_reminder',
+                category: 'event_announcements',
+                message: `Reminder: ${registration.event_name} begins soon at ${startTime}.`,
+                eventId: registration.event_id,
+                link: `/events/${registration.event_id}`,
+                dedupeKey: `event-reminder:${registration.reg_id}`,
+            });
+        }
+    }
+
     app.get(['/api/public/clubs', '/api/clubs'], (req, res) => {
         res.json(db.prepare(publicClubQuery).all());
     });
     app.get(['/api/public/clubs/:id', '/api/clubs/:id'], (req, res, next) => {
-        const club = db.prepare('SELECT club_id, club_name FROM CLUB WHERE club_id = ?').get(req.params.id);
+        const club = db.prepare(`
+            SELECT c.*,
+                (SELECT COUNT(*) FROM CLUB_MEMBERSHIPS m
+                 WHERE m.club_id = c.club_id AND m.status = 'active') AS active_member_count,
+                (SELECT COUNT(*) FROM EVENT e
+                 WHERE e.club_id = c.club_id AND e.status != 'draft') AS event_count,
+                EXISTS (
+                    SELECT 1 FROM EVENT e
+                    WHERE e.club_id = c.club_id AND e.status = 'published' AND e.event_date >= date('now')
+                ) AS has_upcoming_events
+            FROM CLUB c WHERE c.club_id = ?
+        `).get(req.params.id);
         if (!club) return next(new HttpError(404, 'Club not found.'));
-        res.json(club);
+        const isMember = req.session.user?.role === 'student'
+            ? Boolean(db.prepare(`
+                SELECT 1 FROM CLUB_MEMBERSHIPS
+                WHERE student_id = ? AND club_id = ? AND status = 'active'
+            `).get(req.session.user.id, club.club_id))
+            : false;
+        const events = db.prepare(`${publicEventsQuery} WHERE e.club_id = ? AND e.status != 'draft' ORDER BY e.event_date, e.start_time, e.event_id`)
+            .all(club.club_id).map(serializePublicEvent);
+        res.json({ ...club, is_member: isMember, events });
     });
     app.get(['/api/public/events', '/api/events'], (req, res) => {
         registrationService.processExpiredPromotions();
+        processOpenEventAnnouncements();
         res.json(db.prepare(`${publicEventsQuery} WHERE e.status != 'draft' ORDER BY e.event_date, e.start_time, e.event_id`).all().map(serializePublicEvent));
     });
     app.get(['/api/public/events/:id', '/api/events/:id'], (req, res, next) => {
+        processOpenEventAnnouncements();
         const event = db.prepare(`${publicEventsQuery} WHERE e.event_id = ? AND e.status != 'draft'`).get(req.params.id);
         if (!event) return next(new HttpError(404, 'Event not found.'));
         res.json(serializePublicEvent(event));
@@ -750,6 +917,7 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
         const departmentCode = typeof req.query.department_code === 'string' ? req.query.department_code : '';
         const year = Number.parseInt(req.query.year, 10);
         const membership = typeof req.query.membership === 'string' ? req.query.membership : '';
+        const accountStatus = typeof req.query.account_status === 'string' ? req.query.account_status : '';
         const conditions = [];
         const bindings = {};
         if (search) {
@@ -778,6 +946,14 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
             )`);
         } else if (membership) {
             throw new HttpError(400, 'Choose a valid membership filter.');
+        }
+        if (accountStatus === 'no_account') {
+            conditions.push('s.password_hash IS NULL');
+        } else if (accountStatus === 'active' || accountStatus === 'suspended') {
+            conditions.push('s.password_hash IS NOT NULL AND s.account_status = @accountStatus');
+            bindings.accountStatus = accountStatus;
+        } else if (accountStatus) {
+            throw new HttpError(400, 'Choose a valid account status filter.');
         }
         const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
         const total = db.prepare(`
@@ -871,7 +1047,7 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
     });
     app.get('/api/admin/clubs', requireEventManager, (req, res) => {
         if (req.session.user.role === 'organizer') {
-            const result = db.prepare('SELECT club_id, club_name FROM CLUB WHERE club_id = ?')
+            const result = db.prepare('SELECT * FROM CLUB WHERE club_id = ?')
                 .get(req.session.user.club_id);
             return res.json({
                 items: result ? [result] : [],
@@ -880,8 +1056,27 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
                 total: result ? 1 : 0,
             });
         }
-        res.json(listPage(req, 'CLUB', 'club_id, club_name', ['club_name'], 'club_id DESC'));
+        res.json(listPage(req, 'CLUB', '*', ['club_name', 'category', 'description'], 'club_id DESC'));
     });
+    app.get('/api/admin/clubs/:id', requireEventManager, asyncRoute((req, res) => {
+        const club = db.prepare('SELECT * FROM CLUB WHERE club_id = ?').get(req.params.id);
+        if (!club) throw new HttpError(404, 'Club not found.');
+        assertCanManageClub(req.session.user, club.club_id);
+        const memberships = db.prepare(`
+            SELECT m.membership_id, m.student_id, s.fname || ' ' || s.lname AS student_name,
+                s.usn, s.email, s.year, d.department_name, m.designation, m.status, m.joined_at
+            FROM CLUB_MEMBERSHIPS m
+            JOIN STUDENT s ON s.student_id = m.student_id
+            LEFT JOIN DEPARTMENTS d ON d.department_code = s.department_code
+            WHERE m.club_id = ?
+            ORDER BY m.joined_at DESC, m.membership_id DESC
+        `).all(club.club_id);
+        const events = db.prepare(`
+            ${publicEventsQuery} WHERE e.club_id = ?
+            ORDER BY e.event_date DESC, e.start_time, e.event_id DESC
+        `).all(club.club_id).map(serializePublicEvent);
+        res.json({ club, memberships, events });
+    }));
     app.get('/api/admin/events', requireEventManager, (req, res) => {
         const page = Math.max(1, Math.min(100000, Number.parseInt(req.query.page, 10) || 1));
         const limit = Math.max(1, Math.min(100, Number.parseInt(req.query.limit, 10) || 25));
@@ -911,6 +1106,22 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
         `).all({ ...bindings, limit, offset: (page - 1) * limit }).map(serializePublicEvent);
         res.json({ items, page, limit, total });
     });
+    app.get('/api/admin/events/:id', requireEventManager, asyncRoute((req, res) => {
+        const event = db.prepare(`${publicEventsQuery} WHERE e.event_id = ?`).get(req.params.id);
+        if (!event) throw new HttpError(404, 'Event not found.');
+        assertCanManageClub(req.session.user, event.club_id);
+        const registrations = db.prepare(`
+            SELECT r.reg_id, r.student_id, s.fname || ' ' || s.lname AS student_name,
+                s.usn, s.email, s.year, d.department_name, r.entry_fee, r.status,
+                r.waitlist_position, r.created_at AS registered_at, r.promotion_expires_at
+            FROM REGISTRATION r
+            JOIN STUDENT s ON s.student_id = r.student_id
+            LEFT JOIN DEPARTMENTS d ON d.department_code = s.department_code
+            WHERE r.event_id = ?
+            ORDER BY r.created_at DESC, r.reg_id DESC
+        `).all(event.event_id);
+        res.json({ event: serializePublicEvent(event), registrations });
+    }));
     app.get('/api/admin/registrations', requireEventManager, (req, res) => {
         const page = Math.max(1, Math.min(100000, Number.parseInt(req.query.page, 10) || 1));
         const limit = Math.max(1, Math.min(100, Number.parseInt(req.query.limit, 10) || 25));
@@ -932,7 +1143,7 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
         `).get(bindings).count;
         const items = db.prepare(`
             SELECT r.reg_id, r.student_id, r.event_id, r.entry_fee, r.status, r.waitlist_position, s.usn, s.email,
-                s.fname || ' ' || s.lname AS student_name, e.event_name, e.event_date, c.club_name
+                s.fname || ' ' || s.lname AS student_name, e.event_name, e.event_date, e.club_id, c.club_name
             FROM REGISTRATION r JOIN STUDENT s ON s.student_id = r.student_id
             JOIN EVENT e ON e.event_id = r.event_id JOIN CLUB c ON c.club_id = e.club_id
             ${where} ORDER BY r.reg_id DESC LIMIT @limit OFFSET @offset
@@ -970,7 +1181,13 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
     app.get('/api/student/notifications', requireStudent, (req, res) => {
         const page = Math.max(1, Math.min(100000, Number.parseInt(req.query.page, 10) || 1));
         const limit = Math.max(1, Math.min(100, Number.parseInt(req.query.limit, 10) || 25));
-        res.json(listNotifications(db, 'student', req.session.user.id, { page, limit }));
+        const category = typeof req.query.category === 'string' ? req.query.category : undefined;
+        if (category && !['club_updates', 'event_announcements', 'registrations', 'important_updates'].includes(category)) {
+            throw new HttpError(400, 'Choose a valid notification category.');
+        }
+        processOpenEventAnnouncements();
+        processDueEventReminders();
+        res.json(listNotifications(db, 'student', req.session.user.id, { page, limit, category }));
     });
     app.patch('/api/student/notifications/:id/read', requireStudent, requireCsrf, (req, res, next) => {
         const result = db.prepare(`
@@ -990,7 +1207,11 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
     app.get('/api/organizer/notifications', requireOrganizer, (req, res) => {
         const page = Math.max(1, Math.min(100000, Number.parseInt(req.query.page, 10) || 1));
         const limit = Math.max(1, Math.min(100, Number.parseInt(req.query.limit, 10) || 25));
-        res.json(listNotifications(db, 'organizer', req.session.user.id, { page, limit }));
+        const category = typeof req.query.category === 'string' ? req.query.category : undefined;
+        if (category && !['club_updates', 'event_announcements', 'registrations', 'important_updates'].includes(category)) {
+            throw new HttpError(400, 'Choose a valid notification category.');
+        }
+        res.json(listNotifications(db, 'organizer', req.session.user.id, { page, limit, category }));
     });
     app.patch('/api/organizer/notifications/:id/read', requireOrganizer, requireCsrf, (req, res, next) => {
         const result = db.prepare(`
@@ -1082,8 +1303,8 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
         }).strict(), req.body);
         const department = DEPARTMENTS.find(item => item.department_code === body.department_code);
         const result = db.prepare(`
-            INSERT INTO STUDENT (fname, lname, year, branch, department_code)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO STUDENT (fname, lname, year, branch, department_code, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         `).run(body.fname, body.lname, body.year, department.department_name, body.department_code);
         audit(req.session.user, 'admin.student.create', 'student', result.lastInsertRowid);
         res.status(201).json({ student_id: Number(result.lastInsertRowid) });
@@ -1119,24 +1340,184 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
         res.status(204).end();
     }));
 
+    function normalizeClub(input) {
+        const values = validate(clubSchema, input);
+        for (const imagePath of [values.logo_path, values.banner_path]) {
+            if (imagePath && !fs.existsSync(path.join(clubImageDirectory, path.basename(imagePath)))) {
+                throw new HttpError(400, 'Choose an image uploaded to ClubHub.');
+            }
+        }
+        return {
+            club_name: values.club_name,
+            description: values.description,
+            category: values.category,
+            founding_year: values.founding_year ?? null,
+            founder_name: values.founder_name || null,
+            president_name: values.president_name,
+            president_email: values.president_email,
+            president_phone: values.president_phone,
+            mission: values.mission ?? '',
+            contact_email: values.contact_email || null,
+            contact_phone: values.contact_phone || null,
+            logo_path: values.logo_path ?? null,
+            banner_path: values.banner_path ?? null,
+        };
+    }
+
+    function saveClubImage(req, res, next) {
+        if (!req.file) return next(new HttpError(400, 'Choose an image to upload.'));
+        const bytes = req.file.buffer;
+        const isJpeg = bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+        const isPng = bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+        const isWebp = bytes.length >= 12 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
+        const extension = isJpeg ? 'jpg' : isPng ? 'png' : isWebp ? 'webp' : null;
+        if (!extension) return next(new HttpError(400, 'The uploaded file is not a valid JPEG, PNG, or WebP image.'));
+        fs.mkdirSync(clubImageDirectory, { recursive: true });
+        const filename = `${crypto.randomUUID()}.${extension}`;
+        fs.writeFileSync(path.join(clubImageDirectory, filename), bytes, { flag: 'wx' });
+        res.status(201).json({ image_path: `/uploads/clubs/${filename}` });
+    }
+
+    app.post('/api/admin/club-images', requireAdmin, requireCsrf, clubImageUpload.single('image'), saveClubImage);
+    app.post('/api/organizer/clubs/:id/images', requireOrganizer, requireCsrf, clubImageUpload.single('image'), (req, res, next) => {
+        const clubId = Number(req.params.id);
+        if (!Number.isSafeInteger(clubId) || clubId <= 0) return next(new HttpError(400, 'Choose a valid club.'));
+        assertCanManageClub(req.session.user, clubId);
+        return saveClubImage(req, res, next);
+    });
+
+    function removeUnusedClubImage(imagePath) {
+        if (!imagePath || !/^\/uploads\/clubs\/[a-f0-9-]+\.(?:jpg|png|webp)$/.test(imagePath)) return;
+        const stillReferenced = db.prepare('SELECT 1 FROM CLUB WHERE logo_path = ? OR banner_path = ? LIMIT 1')
+            .get(imagePath, imagePath);
+        if (!stillReferenced) {
+            const filename = path.basename(imagePath);
+            const filePath = path.join(clubImageDirectory, filename);
+            if (path.dirname(filePath) === clubImageDirectory && fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        }
+    }
+
+    app.get('/api/organizer/club', requireOrganizer, (req, res, next) => {
+        const clubId = req.session.user.club_id;
+        if (!clubId) return next(new HttpError(403, 'No club is assigned to this organizer account.'));
+        const club = db.prepare(`
+            SELECT c.*,
+                (SELECT COUNT(*) FROM CLUB_MEMBERSHIPS m
+                 WHERE m.club_id = c.club_id AND m.status = 'active') AS active_member_count,
+                (SELECT COUNT(*) FROM EVENT e WHERE e.club_id = c.club_id AND e.status != 'draft') AS event_count
+            FROM CLUB c WHERE c.club_id = ?
+        `).get(clubId);
+        if (!club) return next(new HttpError(404, 'Assigned club not found.'));
+        const events = db.prepare(`${publicEventsQuery} WHERE e.club_id = ? ORDER BY e.event_date, e.start_time, e.event_id`)
+            .all(clubId).map(serializePublicEvent);
+        res.json({ club, events });
+    });
+    app.patch('/api/organizer/club', ...eventManagerMutation((req, res) => {
+        if (req.session.user.role !== 'organizer' || !req.session.user.club_id) {
+            throw new HttpError(403, 'An assigned organizer account is required.');
+        }
+        const clubId = Number(req.session.user.club_id);
+        assertCanManageClub(req.session.user, clubId);
+        const values = normalizeClub(req.body);
+        const existing = db.prepare('SELECT logo_path, banner_path FROM CLUB WHERE club_id = ?').get(clubId);
+        if (!existing) throw new HttpError(404, 'Assigned club not found.');
+        db.prepare(`
+            UPDATE CLUB SET club_name = @club_name, description = @description, category = @category,
+                founding_year = @founding_year, founder_name = @founder_name,
+                president_name = @president_name, president_email = @president_email,
+                president_phone = @president_phone, mission = @mission,
+                contact_email = @contact_email, contact_phone = @contact_phone,
+                logo_path = @logo_path, banner_path = @banner_path
+            WHERE club_id = @club_id
+        `).run({ ...values, club_id: clubId });
+        if (existing.logo_path !== values.logo_path) removeUnusedClubImage(existing.logo_path);
+        if (existing.banner_path !== values.banner_path) removeUnusedClubImage(existing.banner_path);
+        audit(req.session.user, 'organizer.club.update', 'club', clubId);
+        res.json({ message: 'Club profile updated.' });
+    }));
+    app.get('/api/organizer/members', requireOrganizer, (req, res) => {
+        const clubId = req.session.user.club_id;
+        if (!clubId) throw new HttpError(403, 'No club is assigned to this organizer account.');
+        const page = Math.max(1, Math.min(100000, Number.parseInt(req.query.page, 10) || 1));
+        const limit = Math.max(1, Math.min(100, Number.parseInt(req.query.limit, 10) || 25));
+        const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';
+        const conditions = ['m.club_id = ?', "m.status = 'active'"];
+        const bindings = [clubId];
+        if (search) {
+            conditions.push('(s.fname LIKE ? OR s.lname LIKE ? OR s.usn LIKE ?)');
+            const query = `%${search.replace(/[\\%_]/g, '\\$&')}%`;
+            bindings.push(query, query, query);
+        }
+        if (req.query.year !== undefined) {
+            const year = Number.parseInt(req.query.year, 10);
+            if (!ACADEMIC_YEARS.includes(year)) throw new HttpError(400, 'Choose a valid academic year filter.');
+            conditions.push('s.year = ?');
+            bindings.push(year);
+        }
+        if (req.query.department_code !== undefined) {
+            if (!DEPARTMENTS.some(item => item.department_code === req.query.department_code)) {
+                throw new HttpError(400, 'Choose a valid department filter.');
+            }
+            conditions.push('s.department_code = ?');
+            bindings.push(req.query.department_code);
+        }
+        const where = conditions.join(' AND ');
+        const total = db.prepare(`
+            SELECT COUNT(*) AS count FROM CLUB_MEMBERSHIPS m
+            JOIN STUDENT s ON s.student_id = m.student_id WHERE ${where}
+        `).get(...bindings).count;
+        const items = db.prepare(`
+            SELECT m.membership_id, m.student_id, s.fname || ' ' || s.lname AS student_name,
+                s.usn, s.year, d.department_name, m.designation, m.joined_at
+            FROM CLUB_MEMBERSHIPS m JOIN STUDENT s ON s.student_id = m.student_id
+            LEFT JOIN DEPARTMENTS d ON d.department_code = s.department_code
+            WHERE ${where} ORDER BY s.lname COLLATE NOCASE, s.fname COLLATE NOCASE
+            LIMIT ? OFFSET ?
+        `).all(...bindings, limit, (page - 1) * limit);
+        res.json({ items, page, limit, total });
+    });
+
     app.post('/api/admin/clubs', ...adminMutation((req, res) => {
-        const body = validate(clubSchema, req.body);
-        const result = db.prepare('INSERT INTO CLUB (club_name) VALUES (?)').run(body.club_name);
+        const values = normalizeClub(req.body);
+        const result = db.prepare(`
+            INSERT INTO CLUB (
+                club_name, description, category, founding_year, founder_name,
+                president_name, president_email, president_phone, mission, contact_email, contact_phone
+            ) VALUES (
+                @club_name, @description, @category, @founding_year, @founder_name,
+                @president_name, @president_email, @president_phone, @mission, @contact_email, @contact_phone
+            )
+        `).run(values);
         audit(req.session.user, 'admin.club.create', 'club', result.lastInsertRowid);
         res.status(201).json({ club_id: Number(result.lastInsertRowid) });
     }));
     app.patch('/api/admin/clubs/:id', ...adminMutation((req, res) => {
-        const body = validate(clubSchema, req.body);
-        const result = db.prepare('UPDATE CLUB SET club_name = ? WHERE club_id = ?').run(body.club_name, req.params.id);
+        const values = normalizeClub(req.body);
+        const existing = db.prepare('SELECT logo_path, banner_path FROM CLUB WHERE club_id = ?').get(req.params.id);
+        if (!existing) throw new HttpError(404, 'Club not found.');
+        const result = db.prepare(`
+            UPDATE CLUB SET club_name = @club_name, description = @description, category = @category,
+                founding_year = @founding_year, founder_name = @founder_name,
+                president_name = @president_name, president_email = @president_email,
+                president_phone = @president_phone, mission = @mission,
+                contact_email = @contact_email, contact_phone = @contact_phone
+            WHERE club_id = @club_id
+        `).run({ ...values, club_id: Number(req.params.id) });
         if (!result.changes) throw new HttpError(404, 'Club not found.');
+        if (existing.logo_path !== values.logo_path) removeUnusedClubImage(existing.logo_path);
+        if (existing.banner_path !== values.banner_path) removeUnusedClubImage(existing.banner_path);
         audit(req.session.user, 'admin.club.update', 'club', req.params.id);
         res.json({ message: 'Club updated.' });
     }));
     app.delete('/api/admin/clubs/:id', ...adminMutation((req, res) => {
         const eventCount = db.prepare('SELECT COUNT(*) AS count FROM EVENT WHERE club_id = ?').get(req.params.id).count;
         if (eventCount) throw new HttpError(409, 'Move or delete this club’s events before deleting the club.');
+        const club = db.prepare('SELECT logo_path, banner_path FROM CLUB WHERE club_id = ?').get(req.params.id);
+        if (!club) throw new HttpError(404, 'Club not found.');
         const result = db.prepare('DELETE FROM CLUB WHERE club_id = ?').run(req.params.id);
         if (!result.changes) throw new HttpError(404, 'Club not found.');
+        removeUnusedClubImage(club.logo_path);
+        removeUnusedClubImage(club.banner_path);
         audit(req.session.user, 'admin.club.delete', 'club', req.params.id);
         res.status(204).end();
     }));
@@ -1234,6 +1615,7 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
         if (!db.prepare('SELECT club_id FROM CLUB WHERE club_id = ?').get(body.club_id)) throw new HttpError(400, 'Select an existing club.');
         assertCanManageClub(req.session.user, body.club_id);
         const eventId = saveEvent(null, body);
+        processOpenEventAnnouncements();
         audit(req.session.user, 'admin.event.create', 'event', eventId, JSON.stringify({
             status: body.status,
             entry_fee: body.entry_fee,
@@ -1249,6 +1631,7 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
         if (!db.prepare('SELECT club_id FROM CLUB WHERE club_id = ?').get(body.club_id)) throw new HttpError(400, 'Select an existing club.');
         assertCanManageClub(req.session.user, body.club_id);
         saveEvent(Number(req.params.id), body);
+        processOpenEventAnnouncements();
         audit(req.session.user, 'admin.event.update', 'event', req.params.id, JSON.stringify({
             status: body.status,
             entry_fee: body.entry_fee,
@@ -1340,6 +1723,7 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
             if (!updated.changes) throw new HttpError(404, 'Event not found.');
             if (body.status === 'published') recordEventScheduleConflicts(eventId, { ...event, event_name: event.event_name, status: 'published' });
         }
+        processOpenEventAnnouncements();
         audit(req.session.user, `admin.event.${body.status}`, 'event', eventId);
         res.json({ status: body.status });
     }));
@@ -1487,6 +1871,11 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
     app.use((error, req, res, _next) => {
         if (res.headersSent) return;
         if (error instanceof HttpError) return res.status(error.status).json({ error: error.message });
+        if (error?.status === 404) return res.status(404).json({ error: 'The requested file was not found.' });
+        if (error instanceof multer.MulterError) {
+            const status = error.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+            return res.status(status).json({ error: status === 413 ? 'Image files must be 5 MB or smaller.' : 'The image upload could not be processed.' });
+        }
         if (Number.isInteger(error?.status) && error?.code) {
             return res.status(error.status).json({ error: error.message, code: error.code });
         }
@@ -1515,6 +1904,10 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
         app,
         sessionStore,
         processExpiredPromotions: () => registrationService.processExpiredPromotions(),
+        processDueNotifications: () => {
+            processOpenEventAnnouncements();
+            processDueEventReminders();
+        },
     };
 }
 

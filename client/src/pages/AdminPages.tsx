@@ -48,7 +48,7 @@ export function AdminDashboardPage() {
     <section className="admin-content-grid">
       <Card className="chart-card">
         <div className="card-heading"><div><span className="eyebrow">REAL REGISTRATION DATA</span><h2>Participation by event</h2><p>Registration totals for events in your calendar.</p></div></div>
-        {data.registrations_by_event.length ? <div className="chart-wrap"><ResponsiveContainer width="100%" height={280}><BarChart data={data.registrations_by_event} margin={{ top: 10, right: 12, bottom: 10, left: -18 }}><CartesianGrid stroke="var(--line)" strokeDasharray="4 5" vertical={false} /><XAxis dataKey="label" tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} interval={0} angle={-15} textAnchor="end" height={55} /><YAxis allowDecimals={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} /><Tooltip cursor={{ fill: 'var(--chart-hover)' }} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, color: 'var(--ink)' }} /><Bar dataKey="registrations" name="Registrations" fill="#7563D9" radius={[6, 6, 0, 0]} maxBarSize={40} /></BarChart></ResponsiveContainer></div> : <EmptyState title="No event data yet" description="Registration activity will appear when events are created." />}
+        {data.registrations_by_event.length ? <div className="chart-wrap"><ResponsiveContainer width="100%" height={280}><BarChart data={data.registrations_by_event} margin={{ top: 10, right: 12, bottom: 10, left: -18 }}><CartesianGrid stroke="var(--line)" strokeDasharray="4 5" vertical={false} /><XAxis dataKey="label" tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} interval={0} angle={-15} textAnchor="end" height={55} /><YAxis allowDecimals={false} tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} /><Tooltip cursor={{ fill: 'var(--chart-hover)' }} contentStyle={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, color: 'var(--ink)' }} /><Bar dataKey="registrations" name="Registrations" fill="#5B4BDB" radius={[6, 6, 0, 0]} maxBarSize={40} /></BarChart></ResponsiveContainer></div> : <EmptyState title="No event data yet" description="Registration activity will appear when events are created." />}
       </Card>
       <Card className="activity-card">
         <div className="card-heading"><div><span className="eyebrow">ADMINISTRATIVE AUDIT</span><h2>Recent activity</h2><p>Recent account and management actions.</p></div><Link className="text-link" to="/admin/activity">View log <ArrowUpRight size={14} /></Link></div>
@@ -87,6 +87,7 @@ export function AdminStudentsPage() {
   const [department, setDepartment] = useState('');
   const [year, setYear] = useState('');
   const [membership, setMembership] = useState('');
+  const [accountStatus, setAccountStatus] = useState('');
   const [editing, setEditing] = useState<Student | null | undefined>(undefined);
   const queryClient = useQueryClient();
   const notify = useToast();
@@ -95,8 +96,9 @@ export function AdminStudentsPage() {
   if (department) params.set('department_code', department);
   if (year) params.set('year', year);
   if (membership) params.set('membership', membership);
+  if (accountStatus) params.set('account_status', accountStatus);
   const students = useQuery({
-    queryKey: ['admin', 'students', page, search, department, year, membership],
+    queryKey: ['admin', 'students', page, search, department, year, membership, accountStatus],
     queryFn: () => api<PageResult<Student>>(`/admin/students?${params}`),
     placeholderData: previous => previous,
   });
@@ -106,7 +108,7 @@ export function AdminStudentsPage() {
     staleTime: Infinity,
   });
   const form = useForm<StudentInput, unknown, StudentValues>({ resolver: zodResolver(studentSchema) });
-  useEffect(() => { setPage(1); }, [search, department, year, membership]);
+  useEffect(() => { setPage(1); }, [search, department, year, membership, accountStatus]);
 
   const save = useMutation({
     mutationFn: (values: StudentValues) => editing
@@ -139,7 +141,7 @@ export function AdminStudentsPage() {
   return <div className="portal-content">
     <PageTitle eyebrow="CAMPUS COMMUNITY" title="Students" description="Manage student records and account access." action={<Button onClick={() => openForm()}><CirclePlus size={16} /> Add student</Button>} />
     <Card className="table-card">
-      <div className="table-toolbar"><div><h2>Student directory</h2><p>Personal information is visible to authorized administrators only.</p></div><div className="toolbar-filters"><SearchBox value={search} onChange={setSearch} placeholder="Search name, USN, email…" /><select className="select-control" aria-label="Filter by department" value={department} onChange={event => setDepartment(event.target.value)}><option value="">All departments</option>{config.data?.departments.map(item => <option value={item.department_code} key={item.department_code}>{item.department_name}</option>)}</select><select className="select-control" aria-label="Filter by academic year" value={year} onChange={event => setYear(event.target.value)}><option value="">All years</option>{(config.data?.academic_years ?? [1, 2, 3, 4]).map(item => <option value={item} key={item}>{item} Year</option>)}</select><select className="select-control" aria-label="Filter by club membership" value={membership} onChange={event => setMembership(event.target.value)}><option value="">All membership states</option><option value="active">Has active membership</option><option value="none">No active membership</option></select></div></div>
+      <div className="table-toolbar"><div><h2>Student directory</h2><p>Personal information is visible to authorized administrators only.</p></div><div className="toolbar-filters"><SearchBox value={search} onChange={setSearch} placeholder="Search name, USN, email…" /><select className="select-control" aria-label="Filter by department" value={department} onChange={event => setDepartment(event.target.value)}><option value="">All departments</option>{config.data?.departments.map(item => <option value={item.department_code} key={item.department_code}>{item.department_name}</option>)}</select><select className="select-control" aria-label="Filter by academic year" value={year} onChange={event => setYear(event.target.value)}><option value="">All years</option>{(config.data?.academic_years ?? [1, 2, 3, 4]).map(item => <option value={item} key={item}>{item} Year</option>)}</select><select className="select-control" aria-label="Filter by club membership" value={membership} onChange={event => setMembership(event.target.value)}><option value="">All membership states</option><option value="active">Has active membership</option><option value="none">No active membership</option></select><select className="select-control" aria-label="Filter by account status" value={accountStatus} onChange={event => setAccountStatus(event.target.value)}><option value="">All account states</option><option value="active">Active account</option><option value="suspended">Suspended account</option><option value="no_account">No login account</option></select></div></div>
       {students.isLoading ? <PageLoader /> : students.isError ? <QueryError /> : students.data?.items.length ? <div className="responsive-table"><table><thead><tr><th>Student</th><th>USN</th><th>Year / department</th><th>Account</th><th>Actions</th></tr></thead><tbody>
         {students.data.items.map(student => <tr key={student.student_id}><td><Link to={`/admin/students/${student.student_id}`} className="text-link"><strong>{student.full_name}</strong></Link><small>{student.email ?? 'No account email'}</small></td><td>{student.usn ?? <span className="muted-value">Not provided</span>}</td><td>Year {student.year}<small>{student.department_name ?? 'Unspecified (legacy)'}</small></td><td><Badge className={student.has_account ? '' : 'badge-neutral'}>{student.has_account ? student.account_status : 'No account'}</Badge></td><td><div className="table-actions"><Button variant="secondary" className="icon-action" onClick={() => openForm(student)} aria-label={`Edit ${student.full_name}`}><Pencil size={15} /></Button>{student.has_account && <Button variant="secondary" className="text-action" onClick={() => status.mutate(student)}>{student.account_status === 'active' ? 'Suspend' : 'Reactivate'}</Button>}<Button variant="danger" className="icon-action" onClick={() => window.confirm(`Delete ${student.full_name} and their registrations?`) && remove.mutate(student.student_id)} aria-label={`Delete ${student.full_name}`}><Trash2 size={15} /></Button></div></td></tr>)}
       </tbody></table></div> : <EmptyState title="No students found" description={search ? 'Try another search.' : 'Add a student record to get started.'} />}
@@ -157,10 +159,16 @@ export function AdminStudentsPage() {
 
 interface AdminStudentProfile {
   student: Student;
-  club_memberships: { club_name: string; status: string; joined_at: string; designation: string }[];
-  registrations: (Registration & { registered_at: string; start_time: string; end_date: string; end_time: string })[];
-  waitlist_history: { action: string; position: number | null; created_at: string; event_name: string; event_id: number }[];
-  activity: { type: string; created_at: string; resource_type: string; resource_id: string | null; details: string | null }[];
+  club_memberships: { club_id: number; club_name: string; status: string; joined_at: string | null; designation: string }[];
+  registrations: (Registration & { registered_at: string | null; start_time: string; end_date: string; end_time: string })[];
+  waitlist_history: { action: string; position: number | null; created_at: string | null; event_name: string; event_id: number }[];
+  activity: { type: string; created_at: string | null; resource_type: string; resource_id: string | null; details: string | null }[];
+}
+
+function formatStudentDate(value: string | null | undefined, options: Intl.DateTimeFormatOptions = { dateStyle: 'medium' }) {
+  if (!value) return 'Not recorded';
+  const date = new Date(`${value.replace(' ', 'T')}${value.includes('Z') || /[+-]\d{2}:\d{2}$/.test(value) ? '' : 'Z'}`);
+  return Number.isNaN(date.getTime()) ? 'Not recorded' : date.toLocaleString('en-IN', options);
 }
 
 export function AdminStudentDetailPage() {
@@ -172,20 +180,24 @@ export function AdminStudentDetailPage() {
   });
   if (query.isLoading) return <PageLoader label="Loading student profile…" />;
   if (query.isError || !query.data) return <div className="portal-content"><QueryError message="This student profile could not be loaded." /></div>;
-  const { student, registrations, club_memberships, waitlist_history, activity } = query.data;
+  const { student } = query.data;
+  const registrations = query.data.registrations ?? [];
+  const club_memberships = query.data.club_memberships ?? [];
+  const waitlist_history = query.data.waitlist_history ?? [];
+  const activity = query.data.activity ?? [];
   return <div className="portal-content">
     <PageTitle eyebrow="CAMPUS COMMUNITY / STUDENT PROFILE" title={student.full_name} description="Authorized student record and participation history." action={<Link className="button button-secondary" to="/admin/students"><ArrowLeft size={15} /> Student directory</Link>} />
     <section className="admin-content-grid">
-      <Card><span className="eyebrow">STUDENT INFORMATION</span><h2>{student.full_name}</h2><p>{student.email ?? 'No account email'} · {student.usn ?? 'No USN'}</p><p>{student.department_name ?? 'Unspecified (legacy)'} · Year {student.year}</p><p>Account: {student.has_account ? student.account_status : 'No account'}</p><p>Created: {student.created_at ? new Date(student.created_at.replace(' ', 'T') + 'Z').toLocaleString('en-IN') : 'Not recorded'}</p></Card>
-      <Card><span className="eyebrow">CLUB MEMBERSHIPS</span><h2>{club_memberships.filter(item => item.status === 'active').length} active memberships</h2>{club_memberships.length ? club_memberships.map((membership, index) => <p key={`${membership.club_name}-${index}`}>{membership.club_name} · {membership.designation} · {membership.status} · joined {new Date(membership.joined_at.replace(' ', 'T') + 'Z').toLocaleDateString('en-IN')}</p>) : <p>No membership records are available.</p>}</Card>
+      <Card><span className="eyebrow">STUDENT INFORMATION</span><h2>{student.full_name}</h2><p>{student.email ?? 'No account email'} · {student.usn ?? 'No USN'}</p><p>{student.department_name ?? 'Unspecified (legacy)'} · Year {student.year}</p><p>Account: {student.has_account ? student.account_status : 'No account'}</p><p>Created: {formatStudentDate(student.created_at, { dateStyle: 'medium', timeStyle: 'short' })}</p></Card>
+      <Card><span className="eyebrow">CLUB MEMBERSHIPS</span><h2>{club_memberships.filter(item => item.status === 'active').length} active memberships</h2>{club_memberships.length ? club_memberships.map((membership, index) => <p key={`${membership.club_name}-${index}`}><Link className="text-link" to={`/admin/clubs/${membership.club_id}`}>{membership.club_name}</Link> · {membership.designation} · {membership.status} · joined {formatStudentDate(membership.joined_at)}</p>) : <p>No membership records are available.</p>}</Card>
     </section>
     <section className="portal-section">
       <div className="section-heading"><div><span className="eyebrow">EVENT PARTICIPATION</span><h2>Registrations</h2></div></div>
-      <Card className="table-card">{registrations.length ? <div className="responsive-table"><table><thead><tr><th>Event</th><th>Schedule</th><th>Registration</th><th>Fee</th><th>Status</th></tr></thead><tbody>{registrations.map(item => <tr key={item.reg_id}><td><strong>{item.event_name}</strong><small>{item.club_name}</small></td><td>{item.event_date} · {item.start_time}–{item.end_time}</td><td>{new Date(item.registered_at.replace(' ', 'T') + 'Z').toLocaleString('en-IN')}</td><td>₹{Number(item.entry_fee).toFixed(2)}</td><td><Badge>{item.status ?? 'confirmed'}{item.waitlist_position ? ` #${item.waitlist_position}` : ''}</Badge></td></tr>)}</tbody></table></div> : <EmptyState title="No event registrations" description="This student has no event registration history." />}</Card>
+      <Card className="table-card">{registrations.length ? <div className="responsive-table"><table><thead><tr><th>Event</th><th>Schedule</th><th>Registration</th><th>Fee</th><th>Status</th></tr></thead><tbody>{registrations.map(item => <tr key={item.reg_id}><td><Link className="text-link" to={`/admin/events/${item.event_id}`}><strong>{item.event_name}</strong></Link><small>{item.club_name}</small></td><td>{item.event_date} · {item.start_time}–{item.end_time}</td><td>{formatStudentDate(item.registered_at, { dateStyle: 'medium', timeStyle: 'short' })}</td><td>₹{Number(item.entry_fee).toFixed(2)}</td><td><Badge>{item.status ?? 'confirmed'}{item.waitlist_position ? ` #${item.waitlist_position}` : ''}</Badge></td></tr>)}</tbody></table></div> : <EmptyState title="No event registrations" description="This student has no event registration history." />}</Card>
     </section>
     <section className="admin-content-grid">
-      <Card><span className="eyebrow">WAITLIST HISTORY</span><h2>Waitlist activity</h2>{waitlist_history.length ? <ol className="activity-list">{waitlist_history.map((item, index) => <li key={`${item.event_id}-${item.action}-${item.created_at}-${index}`}><span className="activity-dot activity-student" /><div><strong>{item.event_name}: {item.action.replaceAll('_', ' ')}</strong><span>{item.position ? `Position #${item.position}` : ''}</span></div><time>{new Date(item.created_at.replace(' ', 'T') + 'Z').toLocaleDateString('en-IN')}</time></li>)}</ol> : <p>No waitlist history.</p>}</Card>
-      <Card><span className="eyebrow">ACTIVITY TIMELINE</span><h2>Recent activity</h2>{activity.length ? <ol className="activity-list">{activity.map((item, index) => <li key={`${item.type}-${item.created_at}-${index}`}><span className="activity-dot activity-student" /><div><strong>{item.type.replaceAll('.', ' ')}</strong><span>{item.resource_type}{item.resource_id ? ` #${item.resource_id}` : ''}</span></div><time>{new Date(item.created_at.replace(' ', 'T') + 'Z').toLocaleDateString('en-IN')}</time></li>)}</ol> : <p>No tracked activity yet.</p>}</Card>
+      <Card><span className="eyebrow">WAITLIST HISTORY</span><h2>Waitlist activity</h2>{waitlist_history.length ? <ol className="activity-list">{waitlist_history.map((item, index) => <li key={`${item.event_id}-${item.action}-${item.created_at}-${index}`}><span className="activity-dot activity-student" /><div><strong>{item.event_name}: {item.action.replaceAll('_', ' ')}</strong><span>{item.position ? `Position #${item.position}` : ''}</span></div><time>{formatStudentDate(item.created_at)}</time></li>)}</ol> : <p>No waitlist history.</p>}</Card>
+      <Card><span className="eyebrow">ACTIVITY TIMELINE</span><h2>Recent activity</h2>{activity.length ? <ol className="activity-list">{activity.map((item, index) => <li key={`${item.type}-${item.created_at}-${index}`}><span className="activity-dot activity-student" /><div><strong>{item.type.replaceAll('.', ' ')}</strong><span>{item.resource_type}{item.resource_id ? ` #${item.resource_id}` : ''}</span></div><time>{formatStudentDate(item.created_at)}</time></li>)}</ol> : <p>No tracked activity yet.</p>}</Card>
     </section>
   </div>;
 }
@@ -196,6 +208,50 @@ interface OrganizerAccount {
   club_id: number;
   club_name: string;
   created_at: string;
+}
+
+interface AdminClubProfile {
+  club: Club;
+  memberships: {
+    membership_id: number;
+    student_id: number;
+    student_name: string;
+    usn: string | null;
+    email: string | null;
+    year: number;
+    department_name: string | null;
+    designation: string;
+    status: string;
+    joined_at: string;
+  }[];
+  events: Event[];
+}
+
+export function AdminClubDetailPage() {
+  const { clubId = '' } = useParams();
+  const query = useQuery({
+    queryKey: ['admin', 'club', clubId],
+    queryFn: () => api<AdminClubProfile>(`/admin/clubs/${clubId}`),
+    enabled: /^\d+$/.test(clubId),
+  });
+  if (query.isLoading) return <PageLoader label="Loading club details…" />;
+  if (query.isError || !query.data) return <div className="portal-content"><QueryError message="This club and its participation details could not be loaded." /></div>;
+  const { club, memberships, events } = query.data;
+  return <div className="portal-content">
+    <PageTitle eyebrow="CAMPUS COMMUNITY / CLUB DETAILS" title={club.club_name} description="Club members and events hosted by this community." action={<Link className="button button-secondary" to="/admin/clubs"><ArrowLeft size={15} /> Club directory</Link>} />
+    <section className="admin-content-grid">
+      <Card><span className="eyebrow">MEMBERS</span><h2>{memberships.filter(item => item.status === 'active').length} active members</h2><p>{memberships.length} membership records, including past members.</p></Card>
+      <Card><span className="eyebrow">EVENTS</span><h2>{events.length} events</h2><p>All events hosted by this club.</p></Card>
+    </section>
+    <section className="portal-section">
+      <div className="section-heading"><div><span className="eyebrow">COMMUNITY</span><h2>Members</h2></div></div>
+      <Card className="table-card">{memberships.length ? <div className="responsive-table"><table><thead><tr><th>Student</th><th>Year / department</th><th>Designation</th><th>Status</th><th>Joined</th></tr></thead><tbody>{memberships.map(member => <tr key={member.membership_id}><td><Link className="text-link" to={`/admin/students/${member.student_id}`}><strong>{member.student_name}</strong></Link><small>{member.usn ?? 'No USN'}{member.email ? ` · ${member.email}` : ''}</small></td><td>Year {member.year}<small>{member.department_name ?? 'Unspecified department'}</small></td><td>{member.designation.replaceAll('_', ' ')}</td><td><Badge className={member.status === 'active' ? '' : 'badge-neutral'}>{member.status}</Badge></td><td>{new Date(member.joined_at.replace(' ', 'T') + 'Z').toLocaleDateString('en-IN')}</td></tr>)}</tbody></table></div> : <EmptyState title="No membership history" description="Students who join this club will appear here." />}</Card>
+    </section>
+    <section className="portal-section">
+      <div className="section-heading"><div><span className="eyebrow">CLUB CALENDAR</span><h2>Events</h2></div></div>
+      <Card className="table-card">{events.length ? <div className="responsive-table"><table><thead><tr><th>Event</th><th>Schedule</th><th>Registration</th><th>Status</th></tr></thead><tbody>{events.map(event => <tr key={event.event_id}><td><Link className="text-link" to={`/admin/events/${event.event_id}`}><strong>{event.event_name}</strong></Link><small>{event.category}</small></td><td>{event.event_date} · {event.start_time}–{event.end_time}<small>{event.location}</small></td><td>{event.confirmed_count} confirmed · {event.waitlist_count} waiting</td><td><Badge>{event.lifecycle_status.replaceAll('_', ' ')}</Badge></td></tr>)}</tbody></table></div> : <EmptyState title="No events yet" description="Events created for this club will be listed here." />}</Card>
+    </section>
+  </div>;
 }
 
 export function AdminOrganizersPage() {
@@ -277,41 +333,268 @@ export function AdminSettingsPage() {
   </div>;
 }
 
-const clubSchema = z.object({ club_name: z.string().trim().min(1, 'Enter a club name.').max(100) });
+const clubSchema = z.object({
+  club_name: z.string().trim().min(1, 'Enter a club name.').max(100),
+  description: z.string().trim().min(1, 'Enter a club description.').max(5000),
+  category: z.string().trim().min(1, 'Choose a category.').max(80),
+  founding_year: z.string().refine(value => !value || (/^\d{4}$/.test(value) && Number(value) >= 1800 && Number(value) <= new Date().getFullYear()), 'Enter a valid founding year.'),
+  founder_name: z.string().trim().max(120),
+  president_name: z.string().trim().min(1, 'Enter the current president name.').max(120),
+  president_email: z.string().trim().email('Enter a valid president email.').max(254),
+  president_phone: z.string().trim().min(5, 'Enter a president phone number.').max(30),
+  mission: z.string().trim().max(5000),
+  contact_email: z.string().trim().refine(value => !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), 'Enter a valid contact email.').max(254),
+  contact_phone: z.string().trim().max(30),
+  logo_path: z.string(),
+  banner_path: z.string(),
+});
 type ClubValues = z.infer<typeof clubSchema>;
 
 export function AdminClubsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Club | null | undefined>(undefined);
+  const [logoPreview, setLogoPreview] = useState<string>();
+  const [bannerPreview, setBannerPreview] = useState<string>();
+  useEffect(() => () => {
+    if (logoPreview?.startsWith('blob:')) URL.revokeObjectURL(logoPreview);
+    if (bannerPreview?.startsWith('blob:')) URL.revokeObjectURL(bannerPreview);
+  }, [logoPreview, bannerPreview]);
   const queryClient = useQueryClient();
   const notify = useToast();
   const clubs = usePagedData<Club>('/admin/clubs', 'clubs', page, search);
   const form = useForm<ClubValues>({ resolver: zodResolver(clubSchema) });
   useEffect(() => { setPage(1); }, [search]);
   const save = useMutation({
-    mutationFn: (values: ClubValues) => editing
-      ? api(`/admin/clubs/${editing.club_id}`, { method: 'PATCH', body: JSON.stringify(values) })
-      : api('/admin/clubs', { method: 'POST', body: JSON.stringify(values) }),
+    mutationFn: (values: ClubValues) => {
+      const payload = {
+        ...values,
+        founding_year: values.founding_year ? Number(values.founding_year) : null,
+        logo_path: values.logo_path || null,
+        banner_path: values.banner_path || null,
+      };
+      return editing
+        ? api(`/admin/clubs/${editing.club_id}`, { method: 'PATCH', body: JSON.stringify(payload) })
+        : api('/admin/clubs', { method: 'POST', body: JSON.stringify(payload) });
+    },
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['admin', 'clubs'] }); await queryClient.invalidateQueries({ queryKey: ['public'] }); await queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] }); notify(editing ? 'Club updated.' : 'Club created.'); setEditing(undefined); },
     onError: error => notify(error instanceof Error ? error.message : 'Could not save this club.', 'error'),
+  });
+  const uploadImage = useMutation({
+    mutationFn: ({ file }: { kind: 'logo' | 'banner'; file: File }) => {
+      const data = new FormData();
+      data.append('image', file);
+      return api<{ image_path: string }>('/admin/club-images', { method: 'POST', body: data });
+    },
+    onSuccess: (result, variables) => {
+      form.setValue(`${variables.kind}_path`, result.image_path, { shouldDirty: true });
+      if (variables.kind === 'logo') setLogoPreview(result.image_path);
+      else setBannerPreview(result.image_path);
+      notify(`${variables.kind === 'logo' ? 'Logo' : 'Banner'} uploaded. Save the club to apply it.`);
+    },
+    onError: error => notify(error instanceof Error ? error.message : 'Could not upload this image.', 'error'),
   });
   const remove = useMutation({
     mutationFn: (id: number) => api<void>(`/admin/clubs/${id}`, { method: 'DELETE' }),
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['admin'] }); await queryClient.invalidateQueries({ queryKey: ['public'] }); notify('Club deleted.'); },
     onError: error => notify(error instanceof Error ? error.message : 'Could not delete this club.', 'error'),
   });
-  function openForm(club?: Club) { form.reset({ club_name: club?.club_name ?? '' }); setEditing(club ?? null); }
+  function openForm(club?: Club) {
+    form.reset({
+      club_name: club?.club_name ?? '',
+      description: club?.description ?? '',
+      category: club?.category ?? '',
+      founding_year: club?.founding_year ? String(club.founding_year) : '',
+      founder_name: club?.founder_name ?? '',
+      president_name: club?.president_name ?? '',
+      president_email: club?.president_email ?? '',
+      president_phone: club?.president_phone ?? '',
+      mission: club?.mission ?? '',
+      contact_email: club?.contact_email ?? '',
+      contact_phone: club?.contact_phone ?? '',
+      logo_path: club?.logo_path ?? '',
+      banner_path: club?.banner_path ?? '',
+    });
+    setLogoPreview(club?.logo_path ?? undefined);
+    setBannerPreview(club?.banner_path ?? undefined);
+    setEditing(club ?? null);
+  }
+  function chooseClubImage(kind: 'logo' | 'banner', file?: File) {
+    if (!file) return;
+    const preview = URL.createObjectURL(file);
+    if (kind === 'logo') setLogoPreview(preview);
+    else setBannerPreview(preview);
+    uploadImage.mutate({ kind, file });
+  }
+  function clearClubImage(kind: 'logo' | 'banner') {
+    form.setValue(`${kind}_path`, '', { shouldDirty: true });
+    if (kind === 'logo') setLogoPreview(undefined);
+    else setBannerPreview(undefined);
+  }
   return <div className="portal-content">
     <PageTitle eyebrow="WORKSPACE / CLUBS" title="Clubs" description="Grow the campus communities students can discover." action={<Button onClick={() => openForm()}><CirclePlus size={16} /> Add club</Button>} />
     <Card className="table-card">
       <div className="table-toolbar"><div><h2>All clubs</h2><p>Clubs are part of the public campus directory.</p></div><SearchBox value={search} onChange={setSearch} placeholder="Search clubs…" /></div>
-      {clubs.isLoading ? <PageLoader /> : clubs.isError ? <QueryError /> : clubs.data?.items.length ? <div className="responsive-table"><table><thead><tr><th>Club</th><th>Club ID</th><th>Actions</th></tr></thead><tbody>{clubs.data.items.map((club, index) => <tr key={club.club_id}><td><div className={`table-club-mark club-color-${index % 5}`}>{club.club_name.charAt(0).toUpperCase()}</div><strong>{club.club_name}</strong></td><td>{club.club_id}</td><td><div className="table-actions"><Button variant="secondary" className="icon-action" onClick={() => openForm(club)} aria-label={`Edit ${club.club_name}`}><Pencil size={15} /></Button><Button variant="danger" className="icon-action" onClick={() => window.confirm(`Delete ${club.club_name}? Clubs with events must be cleared first.`) && remove.mutate(club.club_id)} aria-label={`Delete ${club.club_name}`}><Trash2 size={15} /></Button></div></td></tr>)}</tbody></table></div> : <EmptyState title="No clubs found" description={search ? 'Try another search.' : 'Create the first campus club.'} />}
+      {clubs.isLoading ? <PageLoader /> : clubs.isError ? <QueryError /> : clubs.data?.items.length ? <div className="responsive-table"><table><thead><tr><th>Club</th><th>Club ID</th><th>Actions</th></tr></thead><tbody>{clubs.data.items.map((club, index) => <tr key={club.club_id}><td><div className={`table-club-mark club-color-${index % 5}`}>{club.club_name.charAt(0).toUpperCase()}</div><Link className="text-link" to={`/admin/clubs/${club.club_id}`}><strong>{club.club_name}</strong></Link></td><td>{club.club_id}</td><td><div className="table-actions"><Button variant="secondary" className="icon-action" onClick={() => openForm(club)} aria-label={`Edit ${club.club_name}`}><Pencil size={15} /></Button><Button variant="danger" className="icon-action" onClick={() => window.confirm(`Delete ${club.club_name}? Clubs with events must be cleared first.`) && remove.mutate(club.club_id)} aria-label={`Delete ${club.club_name}`}><Trash2 size={15} /></Button></div></td></tr>)}</tbody></table></div> : <EmptyState title="No clubs found" description={search ? 'Try another search.' : 'Create the first campus club.'} />}
       {clubs.data && <Pagination page={clubs.data.page} limit={clubs.data.limit} total={clubs.data.total} onPageChange={setPage} />}
     </Card>
-    <Modal open={editing !== undefined} onOpenChange={open => !open && setEditing(undefined)} title={editing ? 'Edit club' : 'Create a club'} description="This club will appear in public campus browsing.">
-      <form className="modal-form" onSubmit={form.handleSubmit(values => save.mutate(values))}><label className="form-field"><span>Club name</span><input {...form.register('club_name')} placeholder="e.g. Robotics Club" />{form.formState.errors.club_name && <small className="field-error">{form.formState.errors.club_name.message}</small>}</label><div className="modal-actions"><Button type="button" variant="secondary" onClick={() => setEditing(undefined)}>Cancel</Button><Button disabled={save.isPending}>{save.isPending ? 'Saving…' : editing ? 'Save changes' : 'Create club'}</Button></div></form>
+    <Modal open={editing !== undefined} onOpenChange={open => !open && setEditing(undefined)} title={editing ? 'Edit club' : 'Create a club'} description="Share the club's purpose and current leadership with campus.">
+      <form className="modal-form" onSubmit={form.handleSubmit(values => save.mutate(values))}>
+        <label className="form-field"><span>Club name</span><input {...form.register('club_name')} placeholder="e.g. Robotics Club" />{form.formState.errors.club_name && <small className="field-error">{form.formState.errors.club_name.message}</small>}</label>
+        <label className="form-field"><span>Description</span><textarea rows={3} {...form.register('description')} placeholder="What does this club do?" />{form.formState.errors.description && <small className="field-error">{form.formState.errors.description.message}</small>}</label>
+        <div className="form-row"><label className="form-field"><span>Category</span><input {...form.register('category')} placeholder="Technology, arts, sports…" />{form.formState.errors.category && <small className="field-error">{form.formState.errors.category.message}</small>}</label><label className="form-field"><span>Founding year</span><input type="number" min="1800" max={new Date().getFullYear()} {...form.register('founding_year')} />{form.formState.errors.founding_year && <small className="field-error">{form.formState.errors.founding_year.message}</small>}</label></div>
+        <div className="form-row"><label className="form-field"><span>Founder</span><input {...form.register('founder_name')} /></label><label className="form-field"><span>Mission / objectives</span><textarea rows={2} {...form.register('mission')} /></label></div>
+        <h3>Current president</h3>
+        <div className="form-row"><label className="form-field"><span>Name</span><input {...form.register('president_name')} />{form.formState.errors.president_name && <small className="field-error">{form.formState.errors.president_name.message}</small>}</label><label className="form-field"><span>Public email</span><input type="email" {...form.register('president_email')} />{form.formState.errors.president_email && <small className="field-error">{form.formState.errors.president_email.message}</small>}</label></div>
+        <div className="form-row"><label className="form-field"><span>Public phone</span><input type="tel" {...form.register('president_phone')} />{form.formState.errors.president_phone && <small className="field-error">{form.formState.errors.president_phone.message}</small>}</label><label className="form-field"><span>Club contact email (optional)</span><input type="email" {...form.register('contact_email')} />{form.formState.errors.contact_email && <small className="field-error">{form.formState.errors.contact_email.message}</small>}</label></div>
+        <label className="form-field"><span>Club contact phone (optional)</span><input type="tel" {...form.register('contact_phone')} /></label>
+        <div className="form-row">
+          <label className="form-field"><span>Club logo (JPEG, PNG, WebP; up to 5 MB)</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => { chooseClubImage('logo', event.currentTarget.files?.[0]); event.currentTarget.value = ''; }} />{logoPreview && <img className="club-image-preview club-image-preview-logo" src={logoPreview} alt="Club logo preview" />}<Button type="button" variant="ghost" onClick={() => clearClubImage('logo')}>Remove logo</Button></label>
+          <label className="form-field"><span>Club banner (JPEG, PNG, WebP; up to 5 MB)</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => { chooseClubImage('banner', event.currentTarget.files?.[0]); event.currentTarget.value = ''; }} />{bannerPreview && <img className="club-image-preview" src={bannerPreview} alt="Club banner preview" />}<Button type="button" variant="ghost" onClick={() => clearClubImage('banner')}>Remove banner</Button></label>
+        </div>
+        <div className="modal-actions"><Button type="button" variant="secondary" onClick={() => setEditing(undefined)}>Cancel</Button><Button disabled={save.isPending || uploadImage.isPending}>{save.isPending ? 'Saving…' : editing ? 'Save changes' : 'Create club'}</Button></div>
+      </form>
     </Modal>
+  </div>;
+}
+
+export function OrganizerDashboardPage() {
+  const [editing, setEditing] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [memberPage, setMemberPage] = useState(1);
+  const queryClient = useQueryClient();
+  const notify = useToast();
+  const clubQuery = useQuery({
+    queryKey: ['organizer', 'club'],
+    queryFn: () => api<{ club: Club; events: Event[] }>('/organizer/club'),
+  });
+  const membersParams = new URLSearchParams({ page: String(memberPage), limit: '8' });
+  if (memberSearch.trim()) membersParams.set('search', memberSearch.trim());
+  const membersQuery = useQuery({
+    queryKey: ['organizer', 'members', memberPage, memberSearch],
+    queryFn: () => api<PageResult<{ membership_id: number; student_id: number; student_name: string; usn: string | null; year: number; department_name: string | null; designation: string; joined_at: string }>>(`/organizer/members?${membersParams}`),
+    placeholderData: previous => previous,
+  });
+  const form = useForm<ClubValues>({ resolver: zodResolver(clubSchema) });
+  useEffect(() => { setMemberPage(1); }, [memberSearch]);
+  function openEditor() {
+    const club = clubQuery.data?.club;
+    if (!club) return;
+    form.reset({
+      club_name: club.club_name,
+      description: club.description ?? '',
+      category: club.category ?? 'Other',
+      founding_year: club.founding_year ? String(club.founding_year) : '',
+      founder_name: club.founder_name ?? '',
+      president_name: club.president_name ?? '',
+      president_email: club.president_email ?? '',
+      president_phone: club.president_phone ?? '',
+      mission: club.mission ?? '',
+      contact_email: club.contact_email ?? '',
+      contact_phone: club.contact_phone ?? '',
+      logo_path: club.logo_path ?? '',
+      banner_path: club.banner_path ?? '',
+    });
+    setEditing(true);
+  }
+  const save = useMutation({
+    mutationFn: (values: ClubValues) => api('/organizer/club', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        ...values,
+        founding_year: values.founding_year ? Number(values.founding_year) : null,
+        logo_path: values.logo_path || null,
+        banner_path: values.banner_path || null,
+      }),
+    }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['organizer', 'club'] });
+      await queryClient.invalidateQueries({ queryKey: ['public'] });
+      notify('Club profile updated.');
+      setEditing(false);
+    },
+    onError: error => notify(error instanceof Error ? error.message : 'Could not update your club.', 'error'),
+  });
+  const uploadImage = useMutation({
+    mutationFn: ({ file }: { kind: 'logo' | 'banner'; file: File }) => {
+      const data = new FormData();
+      data.append('image', file);
+      return api<{ image_path: string }>(`/organizer/clubs/${clubQuery.data?.club.club_id}/images`, { method: 'POST', body: data });
+    },
+    onSuccess: (result, variables) => form.setValue(`${variables.kind}_path`, result.image_path, { shouldDirty: true }),
+    onError: error => notify(error instanceof Error ? error.message : 'Could not upload this image.', 'error'),
+  });
+  if (clubQuery.isLoading) return <PageLoader label="Loading your club workspace…" />;
+  if (clubQuery.isError || !clubQuery.data) return <div className="portal-content"><QueryError message="Your assigned club workspace could not be loaded." /></div>;
+  const { club, events } = clubQuery.data;
+  const upcoming = events.filter(event => !['cancelled', 'completed', 'ongoing'].includes(event.lifecycle_status));
+  const registrationTotal = events.reduce((sum, event) => sum + event.confirmed_count, 0);
+  return <div className="portal-content">
+    <PageTitle eyebrow="ORGANIZER WORKSPACE" title={club.club_name} description="Manage your assigned club, members, and events." action={<Button onClick={openEditor}><Pencil size={15} /> Edit club profile</Button>} />
+    <section className="admin-metrics">
+      <Card className="metric-card metric-teal"><span className="eyebrow">ACTIVE MEMBERS</span><strong>{club.active_member_count ?? 0}</strong></Card>
+      <Card className="metric-card metric-violet"><span className="eyebrow">EVENTS</span><strong>{club.event_count ?? events.length}</strong></Card>
+      <Card className="metric-card metric-gold"><span className="eyebrow">UPCOMING</span><strong>{upcoming.length}</strong></Card>
+      <Card className="metric-card metric-coral"><span className="eyebrow">CONFIRMED REGISTRATIONS</span><strong>{registrationTotal}</strong></Card>
+    </section>
+    <Card className="organizer-club-summary">
+      {club.logo_path ? <img src={club.logo_path} alt={`${club.club_name} logo`} /> : <span className="club-detail-icon">{club.club_name.charAt(0).toUpperCase()}</span>}
+      <div><span className="eyebrow">{club.category || 'CAMPUS COMMUNITY'}</span><h2>{club.club_name}</h2><p>{club.description || 'Add a description to help students discover your club.'}</p><Link className="text-link" to={`/clubs/${club.club_id}`}>View public club page <ArrowUpRight size={14} /></Link></div>
+      <div className="organizer-shortcuts"><Link className="button button-primary" to="/organizer/events">Manage events <CalendarDays size={15} /></Link><Link className="button button-secondary" to="/organizer/members">Member directory <Users size={15} /></Link><Link className="button button-secondary" to="/organizer/registrations">View registrations <ArrowUpRight size={15} /></Link></div>
+    </Card>
+    <section className="portal-section">
+      <div className="section-heading"><div><span className="eyebrow">YOUR COMMUNITY</span><h2>Member directory</h2><p>Only active members of your assigned club are shown.</p></div><Link className="text-link" to="/organizer/members">All members <ArrowUpRight size={14} /></Link></div>
+      <Card className="table-card"><div className="table-toolbar"><div><h2>Active members</h2></div><SearchBox value={memberSearch} onChange={setMemberSearch} placeholder="Search members by name or USN…" /></div>
+        {membersQuery.isLoading ? <PageLoader /> : membersQuery.isError ? <QueryError message="Your member directory could not be loaded." /> : membersQuery.data?.items.length ? <div className="responsive-table"><table><thead><tr><th>Student</th><th>Year / department</th><th>Role</th><th>Joined</th></tr></thead><tbody>{membersQuery.data.items.map(member => <tr key={member.membership_id}><td><strong>{member.student_name}</strong><small>{member.usn ?? 'No USN'}</small></td><td>Year {member.year}<small>{member.department_name ?? 'Department unavailable'}</small></td><td>{member.designation.replaceAll('_', ' ')}</td><td>{formatStudentDate(member.joined_at)}</td></tr>)}</tbody></table></div> : <EmptyState title="No members found" description={memberSearch ? 'Try another name or USN.' : 'Students who join your club will appear here.'} />}
+        {membersQuery.data && <Pagination page={membersQuery.data.page} limit={membersQuery.data.limit} total={membersQuery.data.total} onPageChange={setMemberPage} />}
+      </Card>
+    </section>
+    <section className="portal-section"><div className="section-heading"><div><span className="eyebrow">CLUB CALENDAR</span><h2>Upcoming events</h2></div><Link className="text-link" to="/organizer/events">Manage all events <ArrowUpRight size={14} /></Link></div>
+      {upcoming.length ? <div className="event-grid">{upcoming.slice(0, 3).map(event => <Card className="student-summary-card" key={event.event_id}><Badge>{event.lifecycle_status.replaceAll('_', ' ')}</Badge><h3>{event.event_name}</h3><p>{event.event_date} · {event.start_time} · {event.location}</p><p>{event.confirmed_count}/{event.capacity} confirmed · {event.waitlist_count} waiting</p><Link className="text-link" to={`/organizer/events/${event.event_id}`}>View event details <ArrowUpRight size={14} /></Link></Card>)}</div> : <Card><EmptyState title="No upcoming events" description="Create an event for your club to get started." /></Card>}
+    </section>
+    <Modal open={editing} onOpenChange={setEditing} title="Edit your club" description="Update club details and public leadership information.">
+      <form className="modal-form" onSubmit={form.handleSubmit(values => save.mutate(values))}>
+        <label className="form-field"><span>Club name</span><input {...form.register('club_name')} /></label>
+        <label className="form-field"><span>Description</span><textarea rows={3} {...form.register('description')} /></label>
+        <div className="form-row"><label className="form-field"><span>Category</span><input {...form.register('category')} /></label><label className="form-field"><span>Founding year</span><input type="number" {...form.register('founding_year')} /></label></div>
+        <label className="form-field"><span>Founder</span><input {...form.register('founder_name')} /></label>
+        <label className="form-field"><span>Mission / objectives</span><textarea rows={2} {...form.register('mission')} /></label>
+        <h3>Current president (public contact)</h3>
+        <div className="form-row"><label className="form-field"><span>Name</span><input {...form.register('president_name')} /></label><label className="form-field"><span>Email</span><input type="email" {...form.register('president_email')} /></label></div>
+        <label className="form-field"><span>Phone</span><input type="tel" {...form.register('president_phone')} /></label>
+        <div className="form-row"><label className="form-field"><span>Upload logo</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => { const file = event.currentTarget.files?.[0]; if (file) uploadImage.mutate({ kind: 'logo', file }); event.currentTarget.value = ''; }} />{form.watch('logo_path') && <img className="club-image-preview club-image-preview-logo" src={form.watch('logo_path')} alt="Club logo preview" />}<Button type="button" variant="ghost" onClick={() => form.setValue('logo_path', '', { shouldDirty: true })}>Remove logo</Button></label><label className="form-field"><span>Upload banner</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => { const file = event.currentTarget.files?.[0]; if (file) uploadImage.mutate({ kind: 'banner', file }); event.currentTarget.value = ''; }} />{form.watch('banner_path') && <img className="club-image-preview" src={form.watch('banner_path')} alt="Club banner preview" />}<Button type="button" variant="ghost" onClick={() => form.setValue('banner_path', '', { shouldDirty: true })}>Remove banner</Button></label></div>
+        <input type="hidden" {...form.register('contact_email')} /><input type="hidden" {...form.register('contact_phone')} />
+        <div className="modal-actions"><Button type="button" variant="secondary" onClick={() => setEditing(false)}>Cancel</Button><Button disabled={save.isPending || uploadImage.isPending}>{save.isPending ? 'Saving…' : 'Save club profile'}</Button></div>
+      </form>
+    </Modal>
+  </div>;
+}
+
+export function OrganizerMembersPage() {
+  const [search, setSearch] = useState('');
+  const [year, setYear] = useState('');
+  const [department, setDepartment] = useState('');
+  const [page, setPage] = useState(1);
+  const config = useQuery({
+    queryKey: ['public-config'],
+    queryFn: () => api<{ departments: Department[] }>('/public/config'),
+    staleTime: Infinity,
+  });
+  const params = new URLSearchParams({ page: String(page), limit: '25' });
+  if (search.trim()) params.set('search', search.trim());
+  if (year) params.set('year', year);
+  if (department) params.set('department_code', department);
+  const members = useQuery({
+    queryKey: ['organizer', 'members', page, search, year, department],
+    queryFn: () => api<PageResult<{ membership_id: number; student_name: string; usn: string | null; year: number; department_name: string | null; designation: string; joined_at: string }>>(`/organizer/members?${params}`),
+    placeholderData: previous => previous,
+  });
+  useEffect(() => { setPage(1); }, [search, year, department]);
+  return <div className="portal-content"><PageTitle eyebrow="ORGANIZER WORKSPACE" title="Members" description="Search active members of your assigned club." />
+    <Card className="table-card"><div className="table-toolbar"><div><h2>Member directory</h2><p>Student email and private account information are not shown.</p></div><div className="toolbar-filters"><SearchBox value={search} onChange={setSearch} placeholder="Search name or USN…" /><select className="select-control" aria-label="Filter by academic year" value={year} onChange={event => setYear(event.target.value)}><option value="">All years</option>{[1, 2, 3, 4].map(item => <option value={item} key={item}>{item} Year</option>)}</select><select className="select-control" aria-label="Filter by department" value={department} onChange={event => setDepartment(event.target.value)}><option value="">All departments</option>{config.data?.departments.map(item => <option value={item.department_code} key={item.department_code}>{item.department_name}</option>)}</select></div></div>
+    {members.isLoading ? <PageLoader /> : members.isError ? <QueryError /> : members.data?.items.length ? <div className="responsive-table"><table><thead><tr><th>Student</th><th>Year / department</th><th>Club role</th><th>Joined</th></tr></thead><tbody>{members.data.items.map(member => <tr key={member.membership_id}><td><strong>{member.student_name}</strong><small>{member.usn ?? 'No USN'}</small></td><td>Year {member.year}<small>{member.department_name ?? 'Department unavailable'}</small></td><td>{member.designation.replaceAll('_', ' ')}</td><td>{formatStudentDate(member.joined_at)}</td></tr>)}</tbody></table></div> : <EmptyState title="No members found" description={search ? 'Try another search.' : 'No active memberships exist yet.'} />}
+    {members.data && <Pagination page={members.data.page} limit={members.data.limit} total={members.data.total} onPageChange={setPage} />}
+    </Card>
   </div>;
 }
 
@@ -397,7 +680,7 @@ export function AdminEventsPage() {
     <PageTitle eyebrow="WORKSPACE / EVENTS" title="Events" description="Put meaningful campus moments on the calendar." action={<Button onClick={() => openForm()}><CirclePlus size={16} /> Schedule event</Button>} />
     <Card className="table-card">
       <div className="table-toolbar"><div><h2>Campus calendar</h2><p>Manage events and their organizing communities.</p></div><div className="toolbar-filters"><SearchBox value={search} onChange={setSearch} placeholder="Search events…" /><select className="select-control" aria-label="Filter by club" value={club} onChange={event => setClub(event.target.value)}><option value="">All clubs</option>{clubs.data?.items.map(item => <option value={item.club_id} key={item.club_id}>{item.club_name}</option>)}</select></div></div>
-      {events.isLoading ? <PageLoader /> : events.isError ? <QueryError /> : events.data?.items.length ? <div className="responsive-table"><table><thead><tr><th>Event</th><th>Schedule</th><th>Fee / capacity</th><th>Status</th><th>Club</th><th>Actions</th></tr></thead><tbody>{events.data.items.map(event => <tr key={event.event_id}><td><strong>{event.event_name}</strong><small>{event.category}</small></td><td>{new Date(`${event.event_date.split('T')[0]}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}<small>{event.start_time}–{event.end_time} · {event.location}</small></td><td>{event.entry_fee === 0 ? 'Free' : `₹${event.entry_fee.toFixed(2)}`}<small>{event.confirmed_count}/{event.capacity} confirmed · {event.waitlist_count} waiting</small></td><td><Badge>{event.lifecycle_status.replaceAll('_', ' ')}</Badge></td><td><Badge>{event.club_name}</Badge></td><td><div className="table-actions"><Button variant="secondary" className="icon-action" onClick={() => openForm(event)} aria-label={`Edit ${event.event_name}`}><Pencil size={15} /></Button><Button variant="danger" className="icon-action" onClick={() => window.confirm(`Cancel ${event.event_name}? Registered students will be notified.`) && remove.mutate(event.event_id)} aria-label={`Cancel ${event.event_name}`}><Trash2 size={15} /></Button></div></td></tr>)}</tbody></table></div> : <EmptyState title="No events found" description={search || club ? 'Try changing your filters.' : 'Schedule the first campus event.'} />}
+      {events.isLoading ? <PageLoader /> : events.isError ? <QueryError /> : events.data?.items.length ? <div className="responsive-table"><table><thead><tr><th>Event</th><th>Schedule</th><th>Fee / capacity</th><th>Status</th><th>Club</th><th>Actions</th></tr></thead><tbody>{events.data.items.map(event => <tr key={event.event_id}><td><Link className="text-link" to={`/${user?.role === 'organizer' ? 'organizer' : 'admin'}/events/${event.event_id}`}><strong>{event.event_name}</strong></Link><small>{event.category}</small></td><td>{new Date(`${event.event_date.split('T')[0]}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}<small>{event.start_time}–{event.end_time} · {event.location}</small></td><td>{event.entry_fee === 0 ? 'Free' : `₹${event.entry_fee.toFixed(2)}`}<small>{event.confirmed_count}/{event.capacity} confirmed · {event.waitlist_count} waiting</small></td><td><Badge>{event.lifecycle_status.replaceAll('_', ' ')}</Badge></td><td><Link className="text-link" to={user?.role === 'organizer' ? '/organizer/events' : `/admin/clubs/${event.club_id}`}><Badge>{event.club_name}</Badge></Link></td><td><div className="table-actions"><Button variant="secondary" className="icon-action" onClick={() => openForm(event)} aria-label={`Edit ${event.event_name}`}><Pencil size={15} /></Button><Button variant="danger" className="icon-action" onClick={() => window.confirm(`Cancel ${event.event_name}? Registered students will be notified.`) && remove.mutate(event.event_id)} aria-label={`Cancel ${event.event_name}`}><Trash2 size={15} /></Button></div></td></tr>)}</tbody></table></div> : <EmptyState title="No events found" description={search || club ? 'Try changing your filters.' : 'Schedule the first campus event.'} />}
       {events.data && <Pagination page={events.data.page} limit={events.data.limit} total={events.data.total} onPageChange={setPage} />}
     </Card>
     <Modal open={editing !== undefined} onOpenChange={open => !open && setEditing(undefined)} title={editing ? 'Edit event' : 'Schedule an event'} description="Event details appear in the public campus calendar.">
@@ -419,7 +702,47 @@ export function AdminEventsPage() {
   </div>;
 }
 
+interface AdminEventRegistration extends Registration {
+  student_id: number;
+  student_name: string;
+  year: number;
+  department_name: string | null;
+  registered_at: string;
+}
+
+interface AdminEventProfile {
+  event: Event;
+  registrations: AdminEventRegistration[];
+}
+
+export function AdminEventDetailPage() {
+  const { eventId = '' } = useParams();
+  const { user } = useAuth();
+  const isOrganizer = user?.role === 'organizer';
+  const basePath = isOrganizer ? '/organizer' : '/admin';
+  const query = useQuery({
+    queryKey: ['admin', 'event', eventId],
+    queryFn: () => api<AdminEventProfile>(`/admin/events/${eventId}`),
+    enabled: /^\d+$/.test(eventId),
+  });
+  if (query.isLoading) return <PageLoader label="Loading event details…" />;
+  if (query.isError || !query.data) return <div className="portal-content"><QueryError message="This event and its registration details could not be loaded." /></div>;
+  const { event, registrations } = query.data;
+  return <div className="portal-content">
+    <PageTitle eyebrow="CAMPUS CALENDAR / EVENT DETAILS" title={event.event_name} description="Event information and every student registration." action={<Link className="button button-secondary" to={`${basePath}/events`}><ArrowLeft size={15} /> Events</Link>} />
+    <section className="admin-content-grid">
+      <Card><span className="eyebrow">EVENT INFORMATION</span><h2>{event.event_name}</h2><p>{event.description || 'No description provided.'}</p><p>{event.event_date} · {event.start_time}–{event.end_time}</p><p>{event.location} · {event.category}</p><p>Hosted by {isOrganizer ? event.club_name : <Link className="text-link" to={`/admin/clubs/${event.club_id}`}>{event.club_name}</Link>}</p><p>Status: <Badge>{event.lifecycle_status.replaceAll('_', ' ')}</Badge></p><p>Entry fee: {event.entry_fee === 0 ? 'Free' : `₹${event.entry_fee.toFixed(2)}`}</p></Card>
+      <Card><span className="eyebrow">PARTICIPATION</span><h2>{registrations.filter(item => ['confirmed', 'promotion_pending'].includes(item.status ?? '')).length} confirmed</h2><p>{registrations.length} total registrations · {event.waitlist_count} waitlisted</p><p>{event.available_slots} places available of {event.capacity}</p></Card>
+    </section>
+    <section className="portal-section">
+      <div className="section-heading"><div><span className="eyebrow">STUDENT PARTICIPATION</span><h2>Registrations</h2></div></div>
+      <Card className="table-card">{registrations.length ? <div className="responsive-table"><table><thead><tr><th>Student</th><th>Year / department</th><th>USN</th><th>Fee</th><th>Status</th><th>Registered</th></tr></thead><tbody>{registrations.map(item => <tr key={item.reg_id}><td>{isOrganizer ? <strong>{item.student_name}</strong> : <Link className="text-link" to={`/admin/students/${item.student_id}`}><strong>{item.student_name}</strong></Link>}<small>{item.email ?? 'No email'}</small></td><td>Year {item.year}<small>{item.department_name ?? 'Unspecified department'}</small></td><td>{item.usn ?? 'Legacy record'}</td><td>₹{Number(item.entry_fee).toFixed(2)}</td><td><Badge>{item.status ?? 'confirmed'}{item.waitlist_position ? ` #${item.waitlist_position}` : ''}</Badge></td><td>{item.registered_at ? new Date(item.registered_at.replace(' ', 'T') + 'Z').toLocaleString('en-IN') : '—'}</td></tr>)}</tbody></table></div> : <EmptyState title="No registrations yet" description="Students who register for this event will appear here." />}</Card>
+    </section>
+  </div>;
+}
+
 export function AdminRegistrationsPage() {
+  const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
@@ -436,7 +759,7 @@ export function AdminRegistrationsPage() {
   return <div className="portal-content">
     <PageTitle eyebrow="CAMPUS PARTICIPATION" title="Registrations" description="Review event sign-ups and manage cancellations." />
     <Card className="table-card"><div className="table-toolbar"><div><h2>All registrations</h2><p>Student registration records are restricted to administrators and their owners.</p></div><SearchBox value={search} onChange={setSearch} placeholder="Search student, USN, event…" /></div>
-      {registrations.isLoading ? <PageLoader /> : registrations.isError ? <QueryError /> : registrations.data?.items.length ? <div className="responsive-table"><table><thead><tr><th>Student</th><th>Event</th><th>Club</th><th>Entry fee</th><th>Actions</th></tr></thead><tbody>{registrations.data.items.map(item => <tr key={item.reg_id}><td><strong>{item.student_name}</strong><small>{item.usn ?? 'Legacy record'} {item.email ? `· ${item.email}` : ''}</small></td><td>{item.event_name}</td><td><Badge>{item.club_name}</Badge></td><td>₹ {Number(item.entry_fee).toFixed(2)}</td><td><Button variant="danger" className="text-action" onClick={() => window.confirm(`Cancel ${item.student_name}’s registration for ${item.event_name}?`) && remove.mutate(item.reg_id)}><X size={14} /> Cancel</Button></td></tr>)}</tbody></table></div> : <EmptyState title="No registrations found" description={search ? 'Try another search.' : 'Student registrations will appear here.'} />}
+      {registrations.isLoading ? <PageLoader /> : registrations.isError ? <QueryError /> : registrations.data?.items.length ? <div className="responsive-table"><table><thead><tr><th>Student</th><th>Event</th><th>Club</th><th>Entry fee</th><th>Actions</th></tr></thead><tbody>{registrations.data.items.map(item => <tr key={item.reg_id}><td>{user?.role === 'admin' && item.student_id ? <Link className="text-link" to={`/admin/students/${item.student_id}`}><strong>{item.student_name}</strong></Link> : <strong>{item.student_name}</strong>}<small>{item.usn ?? 'Legacy record'} {item.email ? `· ${item.email}` : ''}</small></td><td><Link className="text-link" to={`/${user?.role === 'organizer' ? 'organizer' : 'admin'}/events/${item.event_id}`}>{item.event_name}</Link></td><td><Link className="text-link" to={user?.role === 'organizer' ? '/organizer/events' : `/admin/clubs/${item.club_id}`}><Badge>{item.club_name}</Badge></Link></td><td>₹ {Number(item.entry_fee).toFixed(2)}</td><td><Button variant="danger" className="text-action" onClick={() => window.confirm(`Cancel ${item.student_name}’s registration for ${item.event_name}?`) && remove.mutate(item.reg_id)}><X size={14} /> Cancel</Button></td></tr>)}</tbody></table></div> : <EmptyState title="No registrations found" description={search ? 'Try another search.' : 'Student registrations will appear here.'} />}
       {registrations.data && <Pagination page={registrations.data.page} limit={registrations.data.limit} total={registrations.data.total} onPageChange={setPage} />}
     </Card>
   </div>;

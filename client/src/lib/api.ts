@@ -30,7 +30,8 @@ export async function refreshCsrfToken(): Promise<void> {
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const method = (init.method ?? 'GET').toUpperCase();
   const headers = new Headers(init.headers);
-  if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
+  if (init.body && !headers.has('Content-Type') && !isFormData) headers.set('Content-Type', 'application/json');
   if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) headers.set('X-CSRF-Token', await fetchCsrfToken());
 
   const response = await fetch(`/api${path}`, {

@@ -28,6 +28,23 @@ export interface Student {
 export interface Club {
   club_id: number;
   club_name: string;
+  description?: string;
+  category?: string;
+  founding_year?: number | null;
+  founder_name?: string | null;
+  president_name?: string | null;
+  president_email?: string | null;
+  president_phone?: string | null;
+  mission?: string;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  logo_path?: string | null;
+  banner_path?: string | null;
+  active_member_count?: number;
+  event_count?: number;
+  has_upcoming_events?: boolean;
+  is_member?: boolean;
+  events?: Event[];
 }
 
 export interface ClubMembership {
@@ -69,6 +86,7 @@ export interface Registration {
   reg_id: number;
   student_id?: number;
   event_id: number;
+  club_id?: number;
   entry_fee: number;
   student_name?: string;
   usn?: string | null;
@@ -89,8 +107,11 @@ export interface Registration {
 export interface Notification {
   notification_id: number;
   notification_type: string;
+  category: 'club_updates' | 'event_announcements' | 'registrations' | 'important_updates';
   message: string;
   event_id: number | null;
+  club_id?: number | null;
+  link?: string | null;
   created_at: string;
   read_at: string | null;
 }

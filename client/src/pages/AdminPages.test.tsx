@@ -24,10 +24,26 @@ describe('admin student profile', () => {
         has_account: false,
         created_at: null,
       },
-      club_memberships: [],
-      registrations: [],
-      waitlist_history: [],
-      activity: [],
+      club_memberships: [{ club_id: 7, club_name: 'Legacy Club', status: 'active', joined_at: null, designation: 'member' }],
+      registrations: [{
+        reg_id: 19,
+        event_id: 4,
+        event_name: 'Legacy Event',
+        club_name: 'Legacy Club',
+        registered_at: null,
+        start_time: '10:00',
+        end_date: '2099-06-15',
+        end_time: '11:00',
+        entry_fee: 0,
+      }],
+      waitlist_history: [{ action: 'joined', position: 1, created_at: null, event_name: 'Legacy Event', event_id: 4 }],
+      activity: [{
+        type: 'account.created',
+        created_at: null,
+        resource_type: 'student',
+        resource_id: '121',
+        details: null,
+      }],
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
 
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -43,5 +59,7 @@ describe('admin student profile', () => {
 
     expect(await screen.findAllByRole('heading', { name: 'Legacy Student' })).toHaveLength(2);
     expect(screen.getByText('Created: Not recorded')).toBeInTheDocument();
+    expect(screen.getByText('account created')).toBeInTheDocument();
+    expect(screen.getAllByText('Not recorded')).toHaveLength(3);
   });
 });

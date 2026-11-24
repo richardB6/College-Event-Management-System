@@ -1,5 +1,7 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const { afterEach, beforeEach, test } = require('node:test');
+const path = require('node:path');
 const bcrypt = require('bcryptjs');
 const request = require('supertest');
 const { createDatabase } = require('../database');
@@ -71,11 +73,155 @@ async function loginAdmin(agent) {
 
 test('public endpoints do not expose student data and management routes require a session', async () => {
     const clubs = await request(app).get('/api/public/clubs').expect(200);
-    assert.deepEqual(clubs.body, [{ club_id: 1, club_name: 'Coding Club' }]);
+    assert.equal(clubs.body.length, 1);
+    assert.equal(clubs.body[0].club_name, 'Coding Club');
+    assert.equal(clubs.body[0].active_member_count, 0);
 
     await request(app).get('/api/admin/students').expect(401);
     await request(app).get('/api/students').expect(401);
     await request(app).get('/api/student/profile').expect(401);
+});
+
+test('admin-created students without accounts return a valid detail profile with a creation timestamp', async () => {
+    const admin = request.agent(app);
+    await loginAdmin(admin);
+    const token = await csrf(admin);
+    const created = await admin.post('/api/admin/students')
+        .set('X-CSRF-Token', token)
+        .send({ fname: 'New', lname: 'Student', year: 1, department_code: 'CSE' })
+        .expect(201);
+
+    const detail = await admin.get(`/api/admin/students/${created.body.student_id}`).expect(200);
+    assert.equal(detail.body.student.has_account, false);
+    assert.equal(detail.body.student.email, null);
+    assert.ok(detail.body.student.created_at);
+    assert.deepEqual(detail.body.club_memberships, []);
+    assert.deepEqual(detail.body.registrations, []);
+    assert.ok(detail.body.activity.some(item => item.type === 'account.created' && item.created_at === detail.body.student.created_at));
+    const noAccountFilter = await admin.get('/api/admin/students?account_status=no_account').expect(200);
+    assert.ok(noAccountFilter.body.items.some(item => item.student_id === created.body.student_id));
+});
+
+test('published events notify active club members and other active students once per opening', async () => {
+    const member = request.agent(app);
+    const generalStudent = request.agent(app);
+    await registerStudent(member, {
+        usn: '2BU24CS031',
+        full_name: 'Club Member',
+        email: 'member@gmail.com',
+    });
+    await registerStudent(generalStudent, {
+        usn: '2BU24CS032',
+        full_name: 'Campus Guest',
+        email: 'guest@gmail.com',
+    });
+    const memberId = db.prepare('SELECT student_id FROM STUDENT WHERE usn = ?').get('2BU24CS031').student_id;
+    db.prepare(`
+        INSERT INTO CLUB_MEMBERSHIPS (student_id, club_id, designation, status)
+        VALUES (?, 1, 'member', 'active')
+    `).run(memberId);
+
+    const admin = request.agent(app);
+    await loginAdmin(admin);
+    const token = await csrf(admin);
+    const event = await admin.post('/api/admin/events')
+        .set('X-CSRF-Token', token)
+        .send({
+            event_name: 'Robotics Open Day',
+            event_date: '2099-08-20',
+            location: 'Robotics Lab',
+            club_id: 1,
+            status: 'draft',
+        })
+        .expect(201);
+    assert.equal(db.prepare('SELECT COUNT(*) AS count FROM NOTIFICATIONS WHERE event_id = ?').get(event.body.event_id).count, 0);
+
+    await admin.patch(`/api/admin/events/${event.body.event_id}/status`)
+        .set('X-CSRF-Token', token)
+        .send({ status: 'published' })
+        .expect(200);
+    const memberNotifications = await member.get('/api/student/notifications').expect(200);
+    const generalNotifications = await generalStudent.get('/api/student/notifications').expect(200);
+    const memberAnnouncement = memberNotifications.body.items.find(item => item.event_id === event.body.event_id);
+    const generalAnnouncement = generalNotifications.body.items.find(item => item.event_id === event.body.event_id);
+    assert.ok(memberAnnouncement);
+    assert.match(memberAnnouncement.message, /Coding Club is organizing Robotics Open Day/);
+    assert.equal(memberAnnouncement.category, 'event_announcements');
+    assert.equal(memberAnnouncement.link, `/events/${event.body.event_id}`);
+    assert.ok(generalAnnouncement);
+    assert.match(generalAnnouncement.message, /New campus event: Robotics Open Day by Coding Club/);
+
+    await request(app).get('/api/public/events').expect(200);
+    assert.equal(db.prepare('SELECT COUNT(*) AS count FROM NOTIFICATIONS WHERE event_id = ? AND notification_type = ?')
+        .get(event.body.event_id, 'event_announcement').count, 2);
+});
+
+test('confirmed event reminders are persisted once and cancelled events are skipped', async () => {
+    const student = request.agent(app);
+    await registerStudent(student, {
+        usn: '2BU24CS033',
+        full_name: 'Reminder Student',
+        email: 'reminder@gmail.com',
+    });
+    const now = new Date();
+    const makeSchedule = offsetHours => {
+        const start = new Date(now.getTime() + offsetHours * 60 * 60 * 1000);
+        const end = new Date(start.getTime() + 60 * 60 * 1000);
+        return {
+            date: start.toISOString().slice(0, 10),
+            start: start.toISOString().slice(11, 16),
+            endDate: end.toISOString().slice(0, 10),
+            end: end.toISOString().slice(11, 16),
+        };
+    };
+    const insertEvent = db.prepare(`
+        INSERT INTO EVENT (event_name, event_date, end_date, start_time, end_time, timezone, location, club_id, status)
+        VALUES (?, ?, ?, ?, ?, 'UTC', ?, 1, ?)
+    `);
+    const reminderSchedule = makeSchedule(12);
+    const reminderEventId = Number(insertEvent.run(
+        'Reminder Workshop', reminderSchedule.date, reminderSchedule.endDate,
+        reminderSchedule.start, reminderSchedule.end, 'Main Hall', 'published',
+    ).lastInsertRowid);
+    const cancelledSchedule = makeSchedule(16);
+    const cancelledEventId = Number(insertEvent.run(
+        'Cancelled Workshop', cancelledSchedule.date, cancelledSchedule.endDate,
+        cancelledSchedule.start, cancelledSchedule.end, 'Main Hall', 'published',
+    ).lastInsertRowid);
+
+    const token = await csrf(student);
+    await student.post('/api/student/registrations').set('X-CSRF-Token', token).send({ event_id: reminderEventId }).expect(201);
+    await student.post('/api/student/registrations').set('X-CSRF-Token', token).send({ event_id: cancelledEventId }).expect(201);
+    db.prepare("UPDATE EVENT SET status = 'cancelled' WHERE event_id = ?").run(cancelledEventId);
+
+    const notifications = await student.get('/api/student/notifications').expect(200);
+    const reminder = notifications.body.items.filter(item => item.notification_type === 'event_reminder' && item.event_id === reminderEventId);
+    const cancelledReminder = notifications.body.items.filter(item => item.notification_type === 'event_reminder' && item.event_id === cancelledEventId);
+    assert.equal(reminder.length, 1);
+    assert.equal(reminder[0].category, 'event_announcements');
+    assert.equal(cancelledReminder.length, 0);
+    await student.get('/api/student/notifications').expect(200);
+    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM NOTIFICATIONS WHERE notification_type = 'event_reminder' AND event_id = ?")
+        .get(reminderEventId).count, 1);
+});
+
+test('club image uploads reject invalid content and serve validated image files', async t => {
+    const admin = request.agent(app);
+    await loginAdmin(admin);
+    const token = await csrf(admin);
+    await admin.post('/api/admin/club-images')
+        .set('X-CSRF-Token', token)
+        .attach('image', Buffer.from('not an image'), { filename: 'invalid.png', contentType: 'image/png' })
+        .expect(400);
+
+    const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const uploaded = await admin.post('/api/admin/club-images')
+        .set('X-CSRF-Token', token)
+        .attach('image', pngHeader, { filename: 'club.png', contentType: 'image/png' })
+        .expect(201);
+    const storedFile = path.join(__dirname, '..', 'uploads', 'clubs', path.basename(uploaded.body.image_path));
+    t.after(() => { if (fs.existsSync(storedFile)) fs.unlinkSync(storedFile); });
+    await request(app).get(uploaded.body.image_path).expect(200);
 });
 
 test('student signup, CSRF, private profile, registration ownership, and logout work', async () => {
@@ -134,6 +280,55 @@ test('student signup, CSRF, private profile, registration ownership, and logout 
     await agent.get('/api/student/profile').expect(401);
 });
 
+test('students can register for paid events while the event fee remains server-controlled', async () => {
+    const agent = request.agent(app);
+    await loginStudent(agent);
+    db.prepare('UPDATE EVENT SET entry_fee = ? WHERE event_id = 1').run(150);
+
+    const event = await agent.get('/api/public/events/1').expect(200);
+    assert.equal(event.body.lifecycle_status, 'registration_open');
+    assert.equal(event.body.entry_fee, 150);
+
+    const token = await csrf(agent);
+    const registration = await agent.post('/api/student/registrations')
+        .set('X-CSRF-Token', token)
+        .send({ event_id: 1, entry_fee: 0 })
+        .expect(201);
+    assert.equal(
+        db.prepare('SELECT entry_fee FROM REGISTRATION WHERE reg_id = ?').get(registration.body.reg_id).entry_fee,
+        150,
+    );
+});
+
+test('admin can inspect club members, hosted events, and event registrants', async () => {
+    const student = request.agent(app);
+    await loginStudent(student);
+    const studentId = db.prepare('SELECT student_id FROM STUDENT WHERE usn = ?').get('2BU24CS001').student_id;
+    db.prepare(`
+        INSERT INTO CLUB_MEMBERSHIPS (student_id, club_id, designation, status)
+        VALUES (?, 1, 'officer', 'active')
+    `).run(studentId);
+    const studentToken = await csrf(student);
+    await student.post('/api/student/registrations')
+        .set('X-CSRF-Token', studentToken)
+        .send({ event_id: 1 })
+        .expect(201);
+
+    const admin = request.agent(app);
+    await loginAdmin(admin);
+    const club = await admin.get('/api/admin/clubs/1').expect(200);
+    assert.equal(club.body.club.club_name, 'Coding Club');
+    assert.equal(club.body.memberships[0].student_id, studentId);
+    assert.equal(club.body.memberships[0].designation, 'officer');
+    assert.equal(club.body.events[0].event_name, 'Campus Workshop');
+
+    const event = await admin.get('/api/admin/events/1').expect(200);
+    assert.equal(event.body.event.event_name, 'Campus Workshop');
+    assert.equal(event.body.registrations[0].student_id, studentId);
+    assert.equal(event.body.registrations[0].student_name, 'Campus Student');
+    assert.equal(event.body.registrations[0].status, 'confirmed');
+});
+
 test('admin can manage campus records while rejecting invalid calendar dates', async () => {
     const agent = request.agent(app);
     await loginAdmin(agent);
@@ -167,13 +362,34 @@ test('admin can manage campus records while rejecting invalid calendar dates', a
         .set('X-CSRF-Token', token)
         .expect(204);
 
+    const newClubFields = {
+        club_name: 'Temporary Club',
+        description: 'A temporary test club.',
+        category: 'Technology',
+        founding_year: 2020,
+        founder_name: 'Club Founder',
+        president_name: 'Current President',
+        president_email: 'president@example.edu',
+        president_phone: '+1 555 0100',
+        mission: 'Build community through technology.',
+        contact_email: '',
+        contact_phone: '',
+    };
+    await agent.post('/api/admin/clubs')
+        .set('X-CSRF-Token', token)
+        .send({ club_name: 'Incomplete Club' })
+        .expect(400);
     const newClub = await agent.post('/api/admin/clubs')
         .set('X-CSRF-Token', token)
-        .send({ club_name: 'Temporary Club' })
+        .send(newClubFields)
         .expect(201);
+    const publicClub = await agent.get(`/api/public/clubs/${newClub.body.club_id}`).expect(200);
+    assert.equal(publicClub.body.president_name, 'Current President');
+    assert.equal(publicClub.body.founding_year, 2020);
+    assert.equal(publicClub.body.active_member_count, 0);
     await agent.patch(`/api/admin/clubs/${newClub.body.club_id}`)
         .set('X-CSRF-Token', token)
-        .send({ club_name: 'Updated Club' })
+        .send({ ...newClubFields, club_name: 'Updated Club' })
         .expect(200);
     await agent.delete(`/api/admin/clubs/${newClub.body.club_id}`)
         .set('X-CSRF-Token', token)
@@ -254,6 +470,9 @@ test('four academic years and the five departments are validated and exposed to 
         .set('X-CSRF-Token', membershipToken)
         .send({})
         .expect(201);
+    const publicClub = await student.get('/api/public/clubs/1').expect(200);
+    assert.equal(publicClub.body.is_member, true);
+    assert.equal(publicClub.body.active_member_count, 1);
     const memberships = await student.get('/api/student/memberships').expect(200);
     assert.equal(memberships.body[0].club_name, 'Coding Club');
     assert.equal(memberships.body[0].status, 'active');
@@ -272,6 +491,7 @@ test('four academic years and the five departments are validated and exposed to 
     await student.delete('/api/student/clubs/1/membership')
         .set('X-CSRF-Token', membershipToken)
         .expect(204);
+    assert.equal((await student.get('/api/public/clubs/1').expect(200)).body.active_member_count, 0);
     const noMembership = await admin.get('/api/admin/students?year=4&membership=none').expect(200);
     assert.equal(noMembership.body.total, 1);
 });
@@ -445,6 +665,42 @@ test('organizer accounts are club-scoped and receive relevant scheduling alerts'
     await organizer.get('/api/admin/students').expect(401);
     const eventList = await organizer.get('/api/admin/events').expect(200);
     assert.ok(eventList.body.items.every(item => item.club_id === 1));
+
+    db.prepare('INSERT INTO CLUB (club_name) VALUES (?)').run('Other Club');
+    await organizer.post('/api/organizer/clubs/2/images')
+        .set('X-CSRF-Token', organizerMutationToken)
+        .expect(403);
+    db.prepare("INSERT INTO CLUB_MEMBERSHIPS (student_id, club_id, status) VALUES (1, 1, 'active')").run();
+    const unrelatedStudentId = Number(db.prepare(`
+        INSERT INTO STUDENT (fname, lname, year, branch) VALUES ('Other', 'Member', 1, 'CSE')
+    `).run().lastInsertRowid);
+    db.prepare("INSERT INTO CLUB_MEMBERSHIPS (student_id, club_id, status) VALUES (?, 2, 'active')").run(unrelatedStudentId);
+
+    const organizerClub = await organizer.get('/api/organizer/club').expect(200);
+    assert.equal(organizerClub.body.club.club_id, 1);
+    assert.equal(organizerClub.body.club.active_member_count, 1);
+    const ownMembers = await organizer.get('/api/organizer/members').expect(200);
+    assert.equal(ownMembers.body.total, 1);
+    assert.equal(ownMembers.body.items[0].student_name, 'Legacy Student');
+    await organizer.patch('/api/organizer/club')
+        .set('X-CSRF-Token', organizerMutationToken)
+        .send({
+            club_name: 'Coding Club',
+            description: 'Updated public club profile.',
+            category: 'Technology',
+            founding_year: null,
+            founder_name: '',
+            president_name: 'Club President',
+            president_email: 'president@example.edu',
+            president_phone: '+1 555 0100',
+            mission: 'Build campus community.',
+            contact_email: '',
+            contact_phone: '',
+            logo_path: null,
+            banner_path: null,
+        })
+        .expect(200);
+    assert.equal(db.prepare('SELECT club_id FROM ADMINS WHERE admin_id = ?').get(created.body.admin_id).club_id, 1);
 
     await organizer.post('/api/admin/events')
         .set('X-CSRF-Token', organizerMutationToken)

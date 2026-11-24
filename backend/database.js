@@ -214,8 +214,8 @@ function seedDatabase(db) {
     `);
 
     const eventRows = eventTemplates.map((eventTemplate) => {
-        const registrationOpensAt = `${eventTemplate.date}T08:00`;
-        const registrationClosesAt = `${eventTemplate.date}T17:00`;
+        const registrationOpensAt = null;
+        const registrationClosesAt = `${eventTemplate.date}T${eventTemplate.start}`;
         const endDate = eventTemplate.date;
         const row = insertEvent.run(
             eventTemplate.name,

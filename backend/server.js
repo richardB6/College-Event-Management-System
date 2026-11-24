@@ -6,15 +6,21 @@ const db = require('./db');
 const { createApp } = require('./app');
 
 const PORT = Number(process.env.PORT) || 3000;
-const { app, sessionStore, processExpiredPromotions } = createApp({ db });
+const { app, sessionStore, processExpiredPromotions, processDueNotifications } = createApp({ db });
 const frontendDirectory = path.join(__dirname, '..', 'frontend', 'dist');
 const promotionTimer = setInterval(() => {
     try {
         processExpiredPromotions();
+        processDueNotifications();
     } catch (error) {
-        console.error(`Waitlist promotion processing failed: ${error?.code || error?.name || 'Error'}`);
+        console.error(`Scheduled campus processing failed: ${error?.code || error?.name || 'Error'}`);
     }
 }, 60 * 1000);
+try {
+    processDueNotifications();
+} catch (error) {
+    console.error(`Initial campus processing failed: ${error?.code || error?.name || 'Error'}`);
+}
 promotionTimer.unref();
 
 app.get(['/index.html'], (_req, res) => res.redirect(302, '/'));

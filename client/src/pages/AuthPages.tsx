@@ -71,7 +71,7 @@ function AuthFrame({ children, admin = false }: { children: React.ReactNode; adm
       <div className="auth-art-copy">
         <span className="auth-art-icon"><Icon size={22} /></span>
         <span className="eyebrow">{admin ? 'CAMPUS WORKSPACE' : 'YOUR CAMPUS, YOUR COMMUNITY'}</span>
-        <h2>{admin ? 'A better campus starts with the people behind it.' : 'There’s more to college than the classroom.'}</h2>
+        <h2>{admin ? 'A better campus starts with the people behind it.' : "There's more to college than the classroom."}</h2>
         <p>{admin ? 'The tools you need to bring your university community together.' : 'Find your people, try something new, and make this year yours.'}</p>
       </div>
       <span className="auth-art-footer">ClubHub · Campus life, connected</span>

@@ -1,13 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, CalendarDays, MapPin, Pencil, UserRound } from 'lucide-react';
+import { ArrowRight, Bell, CalendarDays, Check, MapPin, Pencil, UserRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError, api } from '../lib/api';
-import type { Club, ClubMembership, Department, Event, Registration, Student } from '../lib/types';
+import type { Club, ClubMembership, Department, Event, Notification, Registration, Student } from '../lib/types';
 import { Badge, Button, Card, EmptyState, Modal, useToast } from '../components/ui';
 
 const profileSchema = z.object({
@@ -65,6 +65,7 @@ export function StudentDashboardPage() {
         if (!window.confirm(`${error.message}\n\n${schedule}\n\nRegister anyway? Your decision will be recorded.`)) {
           throw new Error('Registration was not submitted.');
         }
+
         return api<{ status: string; waitlist_position: number | null }>('/student/registrations', {
           method: 'POST',
           body: JSON.stringify({ event_id: event.event_id, allow_conflicts: true }),
@@ -74,8 +75,8 @@ export function StudentDashboardPage() {
     onSuccess: async result => {
       await queryClient.invalidateQueries({ queryKey: ['student', 'registrations'] });
       notify(result.status === 'waitlisted'
-        ? `You’re on the waitlist at position #${result.waitlist_position}.`
-        : 'You’re registered. See you there!');
+        ? `You're on the waitlist at position #${result.waitlist_position}.`
+        : "You're registered. See you there!");
     },
     onError: error => notify(error instanceof Error ? error.message : 'Registration failed.', 'error'),
   });
@@ -131,7 +132,7 @@ export function StudentDashboardPage() {
 
   return <div className="portal-content">
     <header className="portal-page-heading">
-      <div><span className="eyebrow">YOUR CAMPUS, YOUR COMMUNITY</span><h1>Welcome back, {profile.data?.fname ?? user?.full_name?.split(' ')[0] ?? 'there'}.</h1><p>Here’s what’s happening around you.</p></div>
+      <div><span className="eyebrow">YOUR CAMPUS, YOUR COMMUNITY</span><h1>Welcome back, {profile.data?.fname ?? user?.full_name?.split(' ')[0] ?? 'there'}.</h1><p>Here's what's happening around you.</p></div>
       <Button variant="secondary" onClick={openProfile}><Pencil size={15} /> Edit profile</Button>
     </header>
 
@@ -161,7 +162,7 @@ export function StudentDashboardPage() {
           <div className="event-card-content"><Badge>{event.club_name}</Badge><h3>{event.event_name}</h3><p><MapPin size={14} /> {event.location}</p><p>{event.entry_fee === 0 ? 'Free' : `₹${event.entry_fee.toFixed(2)}`} · {event.available_slots} slots left</p></div>
           <Button variant={registeredIds.has(event.event_id) ? 'secondary' : 'primary'} disabled={registeredIds.has(event.event_id) || registerMutation.isPending || !['registration_open', 'full'].includes(event.lifecycle_status)} onClick={() => registerMutation.mutate(event)}>{registeredIds.has(event.event_id) ? 'Registered' : event.lifecycle_status === 'full' ? 'Join waitlist' : 'Join event'}</Button>
         </Card>;
-      })}</div> : <Card><EmptyState title="No upcoming events right now" description="New campus events will appear here as soon as they’re scheduled." /></Card>}
+      })}</div> : <Card><EmptyState title="No upcoming events right now" description="New campus events will appear here as soon as they're scheduled." /></Card>}
     </section>
 
     <section className="portal-section">
@@ -179,7 +180,7 @@ export function StudentDashboardPage() {
                       : future ? 'Confirmed' : 'Completed';
             return <tr key={registration.reg_id}><td><strong>{registration.event_name}</strong></td><td>{registration.event_date ? new Date(`${registration.event_date.split('T')[0]}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td><td><Badge>{registration.club_name}</Badge></td><td>₹ {Number(registration.entry_fee).toFixed(2)}</td><td><Badge className={registration.status === 'confirmed' || registration.status === 'attended' ? 'badge-success' : registration.status === 'cancelled' ? 'badge-neutral' : ''}>{statusLabel}</Badge></td><td>{registration.status === 'promotion_pending' && <Button variant="primary" onClick={() => confirmPromotion.mutate(registration.reg_id)}>Confirm</Button>}{active && future && <Button variant="ghost" onClick={() => window.confirm(`Cancel your registration for ${registration.event_name}?`) && cancelMutation.mutate(registration.reg_id)}>Cancel</Button>}</td></tr>;
           })}
-        </tbody></table></div> : <EmptyState title="No registrations yet" description="Explore the campus calendar and save a place at something you’re excited about." />}
+        </tbody></table></div> : <EmptyState title="No registrations yet" description="Explore the campus calendar and save a place at something you're excited about." />}
       </Card>
     </section>
 
@@ -194,5 +195,48 @@ export function StudentDashboardPage() {
         <div className="modal-actions"><Button type="button" variant="secondary" onClick={() => setProfileOpen(false)}>Cancel</Button><Button disabled={profileMutation.isPending}>{profileMutation.isPending ? 'Saving…' : 'Save changes'}</Button></div>
       </form>
     </Modal>
+  </div>;
+}
+
+const notificationCategories = [
+  { value: '', label: 'All' },
+  { value: 'club_updates', label: 'Club updates' },
+  { value: 'event_announcements', label: 'Event announcements' },
+  { value: 'registrations', label: 'Registrations' },
+  { value: 'important_updates', label: 'Important updates' },
+];
+
+export function NotificationCenterPage() {
+  const { user } = useAuth();
+  const [category, setCategory] = useState('');
+  const [page, setPage] = useState(1);
+  const queryClient = useQueryClient();
+  const prefix = user?.role === 'organizer' ? '/organizer' : '/student';
+  const params = new URLSearchParams({ page: String(page), limit: '20' });
+  if (category) params.set('category', category);
+  const notifications = useQuery({
+    queryKey: ['notifications', 'history', user?.role, page, category],
+    queryFn: () => api<{ items: Notification[]; page: number; limit: number; total: number; unread: number }>(`${prefix}/notifications?${params}`),
+  });
+  const markRead = useMutation({
+    mutationFn: (id: number) => api<void>(`${prefix}/notifications/${id}/read`, { method: 'PATCH' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+  const markAllRead = useMutation({
+    mutationFn: () => api<void>(`${prefix}/notifications/read-all`, { method: 'POST' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+
+  return <div className="portal-content">
+    <header className="portal-page-heading"><div><span className="eyebrow">YOUR UPDATES</span><h1>Notifications</h1><p>Event news, club updates, and registration activity.</p></div><Button variant="secondary" disabled={!notifications.data?.unread || markAllRead.isPending} onClick={() => markAllRead.mutate()}><Check size={15} /> Mark all read</Button></header>
+    <div className="notification-history-filters" aria-label="Filter notifications">{notificationCategories.map(item => <button type="button" className={category === item.value ? 'active' : ''} key={item.value} onClick={() => { setCategory(item.value); setPage(1); }}>{item.label}</button>)}</div>
+    {notifications.isLoading ? <Card><p>Loading notifications…</p></Card> : notifications.isError ? <Card><EmptyState title="Notifications unavailable" description="Please try again in a moment." /></Card> : notifications.data?.items.length ? <>
+      <div className="notification-history-list">{notifications.data.items.map(item => <article className={`notification-history-item${item.read_at ? '' : ' notification-unread'}`} key={item.notification_id}>
+        <span className="notification-history-icon"><Bell size={17} /></span>
+        <div className="notification-history-content"><span className="eyebrow">{item.category.replaceAll('_', ' ')}</span><p>{item.message}</p><time>{new Date(item.created_at.replace(' ', 'T') + 'Z').toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</time></div>
+        <div className="notification-history-actions">{!item.read_at && <Button variant="ghost" onClick={() => markRead.mutate(item.notification_id)}>Mark read</Button>}<Link className="text-link" to={item.link || (item.event_id ? `/events/${item.event_id}` : '/student')}>Open <ArrowRight size={14} /></Link></div>
+      </article>)}</div>
+      <div className="pagination"><span>{(page - 1) * notifications.data.limit + 1}–{Math.min(page * notifications.data.limit, notifications.data.total)} of {notifications.data.total}</span><div><Button variant="secondary" disabled={page <= 1} onClick={() => setPage(current => current - 1)}>Previous</Button><span>Page {page} of {Math.max(1, Math.ceil(notifications.data.total / notifications.data.limit))}</span><Button variant="secondary" disabled={page >= Math.ceil(notifications.data.total / notifications.data.limit)} onClick={() => setPage(current => current + 1)}>Next</Button></div></div>
+    </> : <Card><EmptyState title="You're all caught up" description="New updates will appear here when they arrive." /></Card>}
   </div>;
 }

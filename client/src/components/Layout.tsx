@@ -44,9 +44,11 @@ function PortalNav({ admin }: { admin: boolean }) {
   const { theme, toggleTheme } = useTheme();
   const queryClient = useQueryClient();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationCategory, setNotificationCategory] = useState('');
+  const notificationsPath = user?.role === 'organizer' ? '/organizer/notifications' : '/student/notifications';
   const notifications = useQuery({
-    queryKey: ['notifications', user?.role],
-    queryFn: () => api<{ items: Notification[]; unread: number }>(`${user?.role === 'organizer' ? '/organizer' : '/student'}/notifications?limit=8`),
+    queryKey: ['notifications', user?.role, notificationCategory],
+    queryFn: () => api<{ items: Notification[]; unread: number }>(`${user?.role === 'organizer' ? '/organizer' : '/student'}/notifications?limit=8${notificationCategory ? `&category=${notificationCategory}` : ''}`),
     enabled: user?.role === 'student' || user?.role === 'organizer',
     refetchInterval: 60_000,
   });
@@ -60,8 +62,11 @@ function PortalNav({ admin }: { admin: boolean }) {
   });
   const links = user?.role === 'organizer'
     ? [
+      { to: '/organizer', label: 'My club', icon: LayoutDashboard, end: true },
+      { to: '/organizer/members', label: 'Members', icon: Users },
       { to: '/organizer/events', label: 'My events', icon: CalendarDays },
       { to: '/organizer/registrations', label: 'Registrations', icon: Users },
+      { to: '/organizer/notifications', label: 'Notifications', icon: Bell },
     ]
     : admin
     ? [
@@ -78,6 +83,7 @@ function PortalNav({ admin }: { admin: boolean }) {
       { to: '/student', label: 'My dashboard', icon: LayoutDashboard, end: true },
       { to: '/clubs', label: 'Explore clubs', icon: Compass },
       { to: '/events', label: 'Discover events', icon: CalendarDays },
+      { to: '/student/notifications', label: 'Notifications', icon: Bell },
     ];
 
   async function handleSignOut() {
@@ -109,12 +115,16 @@ function PortalNav({ admin }: { admin: boolean }) {
           </button>
           {notificationsOpen && <section className="notification-popover" aria-label="Notifications">
             <div className="notification-heading"><strong>Notifications</strong><button type="button" className="text-link" disabled={!notifications.data?.unread || markAllRead.isPending} onClick={() => markAllRead.mutate()}>Mark all read</button></div>
-            {notifications.isError ? <p className="notification-empty">Notifications couldn’t be loaded.</p>
+            <div className="notification-category-filters" aria-label="Filter notifications">
+              {[['', 'All'], ['club_updates', 'Clubs'], ['event_announcements', 'Events'], ['registrations', 'Registrations'], ['important_updates', 'Important']].map(([value, label]) => <button type="button" className={notificationCategory === value ? 'active' : ''} key={value} onClick={() => setNotificationCategory(value)}>{label}</button>)}
+            </div>
+            {notifications.isError ? <p className="notification-empty">Notifications couldn't be loaded.</p>
               : notifications.data?.items.length ? <ul>{notifications.data.items.map(item => <li className={item.read_at ? '' : 'notification-unread'} key={item.notification_id}>
-                <Link to={item.event_id ? '/events' : '/student'} onClick={() => { if (!item.read_at) markRead.mutate(item.notification_id); setNotificationsOpen(false); }}>
+                <Link to={item.link || (item.event_id ? `/events/${item.event_id}` : '/student')} onClick={() => { if (!item.read_at) markRead.mutate(item.notification_id); setNotificationsOpen(false); }}>
                   <span>{item.message}</span><time>{new Date(item.created_at.replace(' ', 'T') + 'Z').toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}</time>
                 </Link>
-              </li>)}</ul> : <p className="notification-empty">You’re all caught up.</p>}
+              </li>)}</ul> : <p className="notification-empty">You're all caught up.</p>}
+            <Link className="notification-view-all" to={notificationsPath} onClick={() => setNotificationsOpen(false)}>View notification history <ChevronDown size={14} /></Link>
           </section>}
         </div>}
         <span className="topbar-status"><i /> {user?.role === 'organizer' ? 'Organizer access' : admin ? 'Admin access' : 'Student account'}</span>

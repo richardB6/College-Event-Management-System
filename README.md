@@ -53,9 +53,11 @@ The database is `database/club_management.db`. On startup, the backend applies v
 
 Migration `002_academic_events_registrations.sql` adds the recognized department reference data, club memberships, event schedules and capacity, registration statuses and waitlists, notification storage, scheduling-conflict records, and waitlist settings. Migration `003_academic_years_one_to_four.sql` limits new and updated student records to academic years 1–4. Legacy branch labels are mapped only when they match a known department; other labels are retained and left unassigned.
 
-Back up the database before deploying an application update that runs migrations. The backend seeds the sample campus records only when the student table is empty. The production server checks for expired waitlist offers once per minute; if the process is stopped, expiration processing resumes on startup and on registration-related requests. Notifications are in-app only; email delivery is not configured.
+Migrations `005_club_profiles.sql` and `006_notification_center.sql` add club profile and leadership fields, notification categories and links, and persistent event-opening notification state without replacing existing records. Club logos and banners are stored locally under `backend/uploads/clubs/`; JPEG, PNG, and WebP files are limited to 5 MB. Administrators can edit any club, while organizers can edit only their assigned club.
 
-Administrators can change the waitlist confirmation window under **Admin → Settings** (5–1,440 minutes). The setting applies to newly created offers; it does not change deadlines already issued. Club organizers have access only to event and registration data for their assigned club.
+Back up the database before deploying an application update that runs migrations. The backend seeds the sample campus records only when the student table is empty. The production server processes waitlist expirations, event announcements, and upcoming confirmed-registration reminders once per minute, and resumes idempotently from SQLite state after restart. Notifications are in-app only; email delivery is not configured.
+
+Administrators can change the waitlist confirmation window under **Admin → Settings** (5–1,440 minutes). The setting applies to newly created offers; it does not change deadlines already issued. Club organizers have access only to their assigned club, its active member directory, and its event and registration data.
 
 ## Tests
 
