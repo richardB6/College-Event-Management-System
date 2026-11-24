@@ -6,9 +6,12 @@ import { useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuth } from '../auth/AuthContext';
-import { ApiError, api } from '../lib/api';
-import type { Club, ClubMembership, Department, Event, Notification, Registration, Student } from '../lib/types';
+import { api } from '../lib/api';
+import type { Club, ClubMembership, Department, Event, Notification, Student } from '../lib/types';
 import { Badge, Button, Card, EmptyState, Modal, useToast } from '../components/ui';
+import { CampusLiveTicker } from '../components/CampusLiveTicker';
+import { EventRegistrationButton } from '../components/EventRegistrationButton';
+import { useEventRegistration } from '../hooks/useEventRegistration';
 
 const profileSchema = z.object({
   full_name: z.string().trim().min(2, 'Enter your name.').max(120),
@@ -21,8 +24,7 @@ type ProfileInput = z.input<typeof profileSchema>;
 
 function usePortalQueries() {
   const profile = useQuery({ queryKey: ['student', 'profile'], queryFn: () => api<Student>('/student/profile') });
-  const registrations = useQuery({ queryKey: ['student', 'registrations'], queryFn: () => api<Registration[]>('/student/registrations') });
-  const events = useQuery({ queryKey: ['public', 'events'], queryFn: () => api<Event[]>('/public/events') });
+  const events = useQuery({ queryKey: ['public', 'events'], queryFn: () => api<Event[]>('/public/events'), refetchInterval: 60_000 });
   const clubs = useQuery({ queryKey: ['public', 'clubs'], queryFn: () => api<Club[]>('/public/clubs') });
   const memberships = useQuery({ queryKey: ['student', 'memberships'], queryFn: () => api<ClubMembership[]>('/student/memberships') });
   const config = useQuery({
@@ -30,13 +32,15 @@ function usePortalQueries() {
     queryFn: () => api<{ departments: Department[]; academic_years: number[] }>('/public/config'),
     staleTime: Infinity,
   });
-  return { profile, registrations, events, clubs, memberships, config };
+  return { profile, events, clubs, memberships, config };
 }
 
 export function StudentDashboardPage() {
   const { user } = useAuth();
-  const { profile, registrations, events, clubs, memberships, config } = usePortalQueries();
+  const { profile, events, clubs, memberships, config } = usePortalQueries();
   const queryClient = useQueryClient();
+  const eventRegistration = useEventRegistration();
+  const registrations = eventRegistration.registrations;
   const notify = useToast();
   const [profileOpen, setProfileOpen] = useState(false);
   const profileForm = useForm<ProfileInput, unknown, ProfileValues>({ resolver: zodResolver(profileSchema) });
@@ -46,40 +50,6 @@ export function StudentDashboardPage() {
     new Date(`${event.event_date.split('T')[0]}T00:00:00`) >= today
     && !['cancelled', 'completed'].includes(event.lifecycle_status)
   )).sort((a, b) => a.event_date.localeCompare(b.event_date)), [events.data]);
-  const registeredIds = new Set((registrations.data ?? []).filter(item => (
-    ['confirmed', 'waitlisted', 'promotion_pending'].includes(item.status ?? '')
-  )).map(item => item.event_id));
-
-  const registerMutation = useMutation({
-    mutationFn: async (event: Event) => {
-      try {
-        return await api<{ status: string; waitlist_position: number | null }>('/student/registrations', {
-          method: 'POST',
-          body: JSON.stringify({ event_id: event.event_id }),
-        });
-      } catch (error) {
-        if (!(error instanceof ApiError) || error.code !== 'SCHEDULE_CONFLICT') throw error;
-        const details = error.details as { conflicts?: { event_name: string; event_date: string; start_time: string; end_time: string }[] };
-        const conflicts = details.conflicts ?? [];
-        const schedule = conflicts.map(item => `${item.event_name} (${item.event_date}, ${item.start_time}–${item.end_time})`).join('\n');
-        if (!window.confirm(`${error.message}\n\n${schedule}\n\nRegister anyway? Your decision will be recorded.`)) {
-          throw new Error('Registration was not submitted.');
-        }
-
-        return api<{ status: string; waitlist_position: number | null }>('/student/registrations', {
-          method: 'POST',
-          body: JSON.stringify({ event_id: event.event_id, allow_conflicts: true }),
-        });
-      }
-    },
-    onSuccess: async result => {
-      await queryClient.invalidateQueries({ queryKey: ['student', 'registrations'] });
-      notify(result.status === 'waitlisted'
-        ? `You're on the waitlist at position #${result.waitlist_position}.`
-        : "You're registered. See you there!");
-    },
-    onError: error => notify(error instanceof Error ? error.message : 'Registration failed.', 'error'),
-  });
   const confirmPromotion = useMutation({
     mutationFn: (registrationId: number) => api(`/student/registrations/${registrationId}/confirm`, { method: 'POST' }),
     onSuccess: async () => {
@@ -95,6 +65,7 @@ export function StudentDashboardPage() {
     ),
     onSuccess: async (_result, variables) => {
       await queryClient.invalidateQueries({ queryKey: ['student', 'memberships'] });
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
       notify(variables.joined ? 'You left the club.' : 'You joined the club.');
     },
     onError: error => notify(error instanceof Error ? error.message : 'Could not update club membership.', 'error'),
@@ -136,6 +107,8 @@ export function StudentDashboardPage() {
       <Button variant="secondary" onClick={openProfile}><Pencil size={15} /> Edit profile</Button>
     </header>
 
+    <CampusLiveTicker events={events.data ?? []} />
+
     <section className="student-overview-grid">
       <Card className="student-profile-card">
         <div className="student-profile-top"><span className="profile-avatar profile-avatar-large">{profile.data?.fname.charAt(0).toUpperCase() ?? 'S'}</span><div><span className="eyebrow">YOUR PROFILE</span><h2>{profile.data?.full_name ?? user?.full_name}</h2><p>{profile.data?.usn ?? user?.usn}</p></div></div>
@@ -154,13 +127,13 @@ export function StudentDashboardPage() {
     </section>
 
     <section className="portal-section">
-      <div className="section-heading"><div><span className="eyebrow">SAVE THE DATE</span><h2>Upcoming events</h2><p>Make a little room in your calendar.</p></div><Link className="text-link" to="/events">All events <ArrowRight size={15} /></Link></div>
+      <div className="section-heading"><div><span className="eyebrow">SAVE THE DATE</span><h2>Upcoming events</h2><p>Make a little room in your calendar. {upcoming.length > 3 && <span>Showing 3 of {upcoming.length} upcoming events.</span>}</p></div><Link className="text-link" to="/events">All events <ArrowRight size={15} /></Link></div>
       {upcoming.length ? <div className="event-grid student-event-grid">{upcoming.slice(0, 3).map((event, index) => {
         const eventDate = new Date(`${event.event_date.split('T')[0]}T00:00:00`);
         return <Card className={`event-card event-color-${index % 3}`} key={event.event_id}>
           <div className="event-date"><span>{eventDate.toLocaleDateString('en-IN', { month: 'short' })}</span><strong>{eventDate.toLocaleDateString('en-IN', { day: '2-digit' })}</strong></div>
-          <div className="event-card-content"><Badge>{event.club_name}</Badge><h3>{event.event_name}</h3><p><MapPin size={14} /> {event.location}</p><p>{event.entry_fee === 0 ? 'Free' : `₹${event.entry_fee.toFixed(2)}`} · {event.available_slots} slots left</p></div>
-          <Button variant={registeredIds.has(event.event_id) ? 'secondary' : 'primary'} disabled={registeredIds.has(event.event_id) || registerMutation.isPending || !['registration_open', 'full'].includes(event.lifecycle_status)} onClick={() => registerMutation.mutate(event)}>{registeredIds.has(event.event_id) ? 'Registered' : event.lifecycle_status === 'full' ? 'Join waitlist' : 'Join event'}</Button>
+          <div className="event-card-content"><Badge>{event.club_name}</Badge><h3><Link to={`/events/${event.event_id}`}>{event.event_name}</Link></h3><p><MapPin size={14} /> {event.location}</p><p>{event.entry_fee === 0 ? 'Free' : `₹${event.entry_fee.toFixed(2)}`} · {event.available_slots} slots left</p></div>
+          <EventRegistrationButton event={event} registration={eventRegistration.getRegistration(event.event_id)} isPending={eventRegistration.pendingEventId === event.event_id} isAnyPending={eventRegistration.isPending} isStatusLoading={eventRegistration.registrations.isLoading} isStatusError={eventRegistration.registrations.isError} onRegister={eventRegistration.register} compact />
         </Card>;
       })}</div> : <Card><EmptyState title="No upcoming events right now" description="New campus events will appear here as soon as they're scheduled." /></Card>}
     </section>

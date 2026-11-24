@@ -740,8 +740,19 @@ function createApp({ db, sessionSecret = process.env.SESSION_SECRET, usnPattern 
             const result = db.prepare(`
                 INSERT INTO CLUB_MEMBERSHIPS (student_id, club_id) VALUES (?, ?)
             `).run(req.session.user.id, clubId);
-            audit(req.session.user, 'student.club.join', 'club_membership', result.lastInsertRowid);
-            res.status(201).json({ membership_id: Number(result.lastInsertRowid), club_id: clubId, status: 'active' });
+            const membershipId = Number(result.lastInsertRowid);
+            audit(req.session.user, 'student.club.join', 'club_membership', membershipId);
+            createNotification(db, {
+                recipientRole: 'student',
+                recipientId: req.session.user.id,
+                type: 'club_joined',
+                category: 'club_updates',
+                message: `Welcome to ${club.club_name}!`,
+                clubId,
+                link: `/clubs/${clubId}`,
+                dedupeKey: `club-joined:${membershipId}`,
+            });
+            res.status(201).json({ membership_id: membershipId, club_id: clubId, status: 'active' });
         } catch (error) {
             if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE') {
                 return next(new HttpError(409, 'You are already an active member of this club.'));

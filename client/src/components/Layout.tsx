@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link, NavLink, Outlet, Navigate, useLocation } from 'react-router-dom';
 import { Bell, CalendarDays, ChevronDown, Compass, LayoutDashboard, LogOut, Menu, Moon, Settings, Shield, Sun, Users, X } from 'lucide-react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { PageLoader, useTheme } from './ui';
 import { api } from '../lib/api';
-import type { Notification } from '../lib/types';
+import { useRecentNotifications } from '../hooks/useRecentNotifications';
 
 function Brand() {
   return <Link className="brand" to="/"><span className="brand-mark">C</span><span>clubhub</span></Link>;
@@ -46,12 +46,10 @@ function PortalNav({ admin }: { admin: boolean }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationCategory, setNotificationCategory] = useState('');
   const notificationsPath = user?.role === 'organizer' ? '/organizer/notifications' : '/student/notifications';
-  const notifications = useQuery({
-    queryKey: ['notifications', user?.role, notificationCategory],
-    queryFn: () => api<{ items: Notification[]; unread: number }>(`${user?.role === 'organizer' ? '/organizer' : '/student'}/notifications?limit=8${notificationCategory ? `&category=${notificationCategory}` : ''}`),
-    enabled: user?.role === 'student' || user?.role === 'organizer',
-    refetchInterval: 60_000,
-  });
+  const notifications = useRecentNotifications(user?.role, true);
+  const notificationItems = (notifications.data?.items ?? [])
+    .filter(item => !notificationCategory || item.category === notificationCategory)
+    .slice(0, 8);
   const markRead = useMutation({
     mutationFn: (id: number) => api<void>(`${user?.role === 'organizer' ? '/organizer' : '/student'}/notifications/${id}/read`, { method: 'PATCH' }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
@@ -119,7 +117,7 @@ function PortalNav({ admin }: { admin: boolean }) {
               {[['', 'All'], ['club_updates', 'Clubs'], ['event_announcements', 'Events'], ['registrations', 'Registrations'], ['important_updates', 'Important']].map(([value, label]) => <button type="button" className={notificationCategory === value ? 'active' : ''} key={value} onClick={() => setNotificationCategory(value)}>{label}</button>)}
             </div>
             {notifications.isError ? <p className="notification-empty">Notifications couldn't be loaded.</p>
-              : notifications.data?.items.length ? <ul>{notifications.data.items.map(item => <li className={item.read_at ? '' : 'notification-unread'} key={item.notification_id}>
+              : notificationItems.length ? <ul>{notificationItems.map(item => <li className={item.read_at ? '' : 'notification-unread'} key={item.notification_id}>
                 <Link to={item.link || (item.event_id ? `/events/${item.event_id}` : '/student')} onClick={() => { if (!item.read_at) markRead.mutate(item.notification_id); setNotificationsOpen(false); }}>
                   <span>{item.message}</span><time>{new Date(item.created_at.replace(' ', 'T') + 'Z').toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}</time>
                 </Link>

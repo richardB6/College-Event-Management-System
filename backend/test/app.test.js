@@ -156,6 +156,38 @@ test('published events notify active club members and other active students once
         .get(event.body.event_id, 'event_announcement').count, 2);
 });
 
+test('joining a club creates a private, linked club update for the joining student', async () => {
+    const member = request.agent(app);
+    const otherStudent = request.agent(app);
+    await registerStudent(member, {
+        usn: '2BU24CS034',
+        full_name: 'Joining Student',
+        email: 'joining@gmail.com',
+    });
+    await registerStudent(otherStudent, {
+        usn: '2BU24CS035',
+        full_name: 'Another Student',
+        email: 'another@gmail.com',
+    });
+
+    const token = await csrf(member);
+    await member.post('/api/student/clubs/1/membership')
+        .set('X-CSRF-Token', token)
+        .send({})
+        .expect(201);
+
+    const memberNotifications = await member.get('/api/student/notifications').expect(200);
+    const membershipUpdate = memberNotifications.body.items.find(item => item.notification_type === 'club_joined');
+    assert.ok(membershipUpdate);
+    assert.equal(membershipUpdate.category, 'club_updates');
+    assert.equal(membershipUpdate.club_id, 1);
+    assert.equal(membershipUpdate.link, '/clubs/1');
+    assert.equal(membershipUpdate.message, 'Welcome to Coding Club!');
+
+    const otherNotifications = await otherStudent.get('/api/student/notifications').expect(200);
+    assert.equal(otherNotifications.body.items.some(item => item.notification_type === 'club_joined'), false);
+});
+
 test('confirmed event reminders are persisted once and cancelled events are skipped', async () => {
     const student = request.agent(app);
     await registerStudent(student, {

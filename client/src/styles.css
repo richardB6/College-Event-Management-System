@@ -241,6 +241,14 @@ img { display: block; max-width: 100%; }
 .event-register-link:hover:not(:disabled) { background: var(--event-accent); color: white; }
 .event-register-link:disabled { cursor: default; opacity: .58; }
 .event-register-link span { font-size: 10px; font-weight: 700; }
+.event-card .event-register-link { display: flex; width: auto; height: auto; flex: 0 0 auto; align-items: flex-end; justify-content: center; overflow: visible; border-radius: 0; background: transparent; color: inherit; }
+.event-card .event-register-link .event-registration-control { max-width: 150px; }
+.event-card .event-register-link .button { width: 100%; padding-right: 10px; padding-left: 10px; font-size: 10px; }
+.event-card .event-register-link > span { display: block; padding: 8px; color: var(--muted); }
+.event-registration-control { display: grid; justify-items: end; gap: 5px; }
+.event-registration-opening { max-width: 180px; color: var(--muted); font-size: 9px; line-height: 1.35; text-align: right; }
+.event-detail-card .event-registration-control { justify-items: start; }
+.event-detail-card .event-registration-opening { max-width: 100%; text-align: left; }
 .event-list { display: grid; gap: 12px; }
 .event-list .event-card { min-height: 130px; }
 
@@ -587,6 +595,30 @@ tbody td small { margin-top: 3px; color: var(--faint); font-size: 10px; }
 .notification-history-actions { display: flex; align-items: center; gap: 12px; }
 .notification-history-actions .text-link { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .notification-empty { padding: 14px 4px 4px; }
+.campus-live-ticker { display: flex; min-width: 0; align-items: center; gap: 14px; margin: 0 0 24px; padding: 11px 14px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--purple) 18%, var(--line)); border-radius: 14px; background: color-mix(in srgb, var(--purple-soft) 46%, var(--surface)); }
+.campus-ticker-heading { display: flex; flex: 0 0 auto; align-items: center; gap: 9px; }
+.campus-ticker-icon { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 10px; background: var(--purple-soft); color: var(--purple); }
+.campus-ticker-heading > div { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.campus-ticker-heading strong { font-size: 11px; font-weight: 750; }
+.campus-live-indicator { display: inline-flex; align-items: center; gap: 4px; color: var(--danger); font-size: 8px; font-weight: 800; letter-spacing: .08em; }
+.campus-live-indicator i { width: 6px; height: 6px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 12%, transparent); }
+.campus-ticker-window { min-width: 0; flex: 1; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 2%, #000 98%, transparent); }
+.campus-ticker-track { display: flex; width: max-content; }
+.campus-ticker-track:not(.campus-ticker-animated) { width: 100%; }
+.campus-ticker-track.campus-ticker-animated { animation: campusTickerScroll 42s linear infinite; }
+.campus-ticker-group { display: flex; flex: 0 0 max-content; align-items: center; }
+.campus-ticker-track:not(.campus-ticker-animated) .campus-ticker-group { min-width: 0; flex: 1 1 100%; flex-wrap: wrap; }
+.campus-ticker-item { display: inline-flex; align-items: center; padding: 0 26px; color: var(--ink); font-size: 11px; line-height: 1.5; white-space: nowrap; }
+.campus-ticker-track:not(.campus-ticker-animated) .campus-ticker-item { padding: 0 8px; white-space: normal; }
+a.campus-ticker-item:hover { color: var(--purple); text-decoration: underline; text-underline-offset: 3px; }
+.ticker-item-context { margin-left: 3px; color: var(--muted); }
+.campus-ticker-empty { margin: 0; color: var(--muted); font-size: 11px; }
+.campus-ticker-toggle { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--muted); cursor: pointer; }
+.campus-ticker-toggle:hover, .campus-ticker-toggle:focus-visible { border-color: var(--purple); color: var(--purple); }
+.campus-ticker-paused .campus-ticker-track { animation-play-state: paused; }
+.campus-live-ticker:focus-within .campus-ticker-track, .campus-ticker-window:hover .campus-ticker-track { animation-play-state: paused; }
+.campus-live-ticker a:focus-visible, .campus-ticker-toggle:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+@keyframes campusTickerScroll { to { transform: translateX(-50%); } }
 .modal-form textarea { width: 100%; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; resize: vertical; transition: border-color .18s ease, box-shadow .18s ease; }
 .modal-form textarea:focus { border-color: var(--purple); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--purple) 13%, transparent); }
 
@@ -644,6 +676,10 @@ tbody td small { margin-top: 3px; color: var(--faint); font-size: 10px; }
   .student-overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .student-profile-card { grid-column: 1 / -1; }
   .student-event-grid { grid-template-columns: 1fr; }
+  .campus-live-ticker { gap: 9px; padding: 10px; }
+  .campus-ticker-heading { gap: 7px; }
+  .campus-ticker-heading strong { font-size: 10px; }
+  .campus-ticker-item { padding-right: 20px; padding-left: 20px; font-size: 10px; }
 }
 
 /* ============================
@@ -698,6 +734,10 @@ tbody td small { margin-top: 3px; color: var(--faint); font-size: 10px; }
   .student-profile-card { grid-column: auto; }
   .student-summary-card { min-height: 130px; }
   .notification-history-item { flex-wrap: wrap; }
+  .campus-live-ticker { align-items: flex-start; }
+  .campus-ticker-heading { align-self: flex-start; }
+  .campus-ticker-heading > div { align-items: flex-start; flex-direction: column; gap: 0; }
+  .campus-ticker-window { align-self: center; }
   .notification-history-actions { width: 100%; margin-left: 49px; justify-content: flex-start; }
   .organizer-club-summary { grid-template-columns: auto minmax(0, 1fr); align-items: flex-start; }
   .organizer-shortcuts { grid-column: 1 / -1; width: 100%; }

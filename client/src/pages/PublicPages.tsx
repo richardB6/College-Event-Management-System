@@ -1,40 +1,39 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDownRight, ArrowRight, ArrowUpRight, CalendarDays, Compass, Mail, MapPin, Phone, Sparkles, UserPlus } from 'lucide-react';
-import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useState, type ReactNode } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { Club, Event } from '../lib/types';
 import { Badge, Button, EmptyState, PageLoader } from '../components/ui';
 import { useAuth } from '../auth/AuthContext';
+import { useEventRegistration } from '../hooks/useEventRegistration';
+import { EventRegistrationButton } from '../components/EventRegistrationButton';
 
 function usePublicData<T>(path: string, key: string) {
   return useQuery({ queryKey: ['public', key], queryFn: () => api<T>(path), staleTime: 60_000 });
 }
 
-function EventCard({ event, index, onRegister }: { event: Event; index: number; onRegister?: () => void }) {
+function EventCard({ event, index, action }: { event: Event; index: number; action?: ReactNode }) {
   const date = new Date(`${event.event_date.split('T')[0]}T00:00:00`);
   const isUpcoming = date >= new Date(new Date().setHours(0, 0, 0, 0));
   return <article className={`event-card event-color-${index % 3}`}>
     <div className="event-date"><span>{date.toLocaleDateString('en-IN', { month: 'short' })}</span><strong>{date.toLocaleDateString('en-IN', { day: '2-digit' })}</strong></div>
     <div className="event-card-content">
       <Badge>{event.club_name}</Badge>
-      <h3>{event.event_name}</h3>
+      <h3><Link to={`/events/${event.event_id}`}>{event.event_name}</Link></h3>
       <p><MapPin size={14} /> {event.location}</p>
       <span className="event-full-date"><CalendarDays size={13} /> {date.toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</span>
       <span className="event-full-date">{event.entry_fee === 0 ? 'Free entry' : `Entry fee ₹${event.entry_fee.toFixed(2)}`} · {event.available_slots} places left</span>
     </div>
-    {onRegister && <button className="event-register-link" onClick={onRegister} disabled={!isUpcoming} aria-label={isUpcoming ? `Register for ${event.event_name}` : `${event.event_name} registration is closed`}>
-      {isUpcoming ? <ArrowUpRight size={18} /> : <span>Past</span>}
-    </button>}
+    {action && <div className="event-register-link">{isUpcoming ? action : <span>Past</span>}</div>}
   </article>;
 }
 
 export function HomePage() {
-  const { user } = useAuth();
   const clubs = usePublicData<Club[]>('/public/clubs', 'clubs');
   const events = usePublicData<Event[]>('/public/events', 'events');
   const stats = usePublicData<{ students: number; clubs: number; events: number }>('/public/stats', 'stats');
-  const navigate = useNavigate();
+  const registration = useEventRegistration();
   const upcoming = (events.data ?? []).filter(event => new Date(`${event.event_date.split('T')[0]}T00:00:00`) >= new Date(new Date().setHours(0, 0, 0, 0)))
     .sort((a, b) => a.event_date.localeCompare(b.event_date)).slice(0, 3);
 
@@ -97,7 +96,7 @@ export function HomePage() {
     <section className="events-showcase">
       <div className="content-section">
         <div className="section-heading"><div><span className="eyebrow">SAVE THE DATE</span><h2>Coming up on campus</h2><p>Good things happen when you put them on the calendar.</p></div><Link className="text-link" to="/events">Explore events <ArrowRight size={15} /></Link></div>
-        {events.isLoading ? <PageLoader label="Checking the campus calendar…" /> : events.isError ? <EmptyState title="Events couldn't be loaded" description="Please refresh the page to try again." /> : upcoming.length ? <div className="event-grid">{upcoming.map((event, index) => <EventCard key={event.event_id} event={event} index={index} onRegister={() => navigate(user?.role === 'student' ? '/student' : '/student/login', user?.role === 'student' ? undefined : { state: { message: 'Sign in to your student account to register for this event.' } })} />)}</div> : <EmptyState title="A little quiet for now" description="No upcoming events are scheduled. Check back soon." />}
+        {events.isLoading ? <PageLoader label="Checking the campus calendar…" /> : events.isError ? <EmptyState title="Events couldn't be loaded" description="Please refresh the page to try again." /> : upcoming.length ? <div className="event-grid">{upcoming.map((event, index) => <EventCard key={event.event_id} event={event} index={index} action={<EventRegistrationButton event={event} registration={registration.getRegistration(event.event_id)} isPending={registration.pendingEventId === event.event_id} isAnyPending={registration.isPending} isStatusLoading={registration.registrations.isLoading} isStatusError={registration.registrations.isError} onRegister={registration.register} compact />} />)}</div> : <EmptyState title="A little quiet for now" description="No upcoming events are scheduled. Check back soon." />}
       </div>
     </section>
 
@@ -142,6 +141,7 @@ export function ClubDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ['public', `club-${clubId}`] });
       await queryClient.invalidateQueries({ queryKey: ['public', 'clubs'] });
       await queryClient.invalidateQueries({ queryKey: ['student', 'memberships'] });
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
   if (club.isLoading) return <PageLoader />;
@@ -188,14 +188,14 @@ function ClubEventSection({ title, eyebrow, events, empty }: { title: string; ey
 export function EventDetailPage() {
   const { eventId = '' } = useParams();
   const event = useQuery({ queryKey: ['public', 'event', eventId], queryFn: () => api<Event>(`/public/events/${eventId}`), enabled: /^\d+$/.test(eventId) });
+  const registration = useEventRegistration();
   if (event.isLoading) return <PageLoader />;
   if (event.isError || !event.data) return <main className="public-listing"><EmptyState title="Event not found" description="This event is unavailable or has been removed." /><Link className="text-link" to="/events">Browse events</Link></main>;
   const item = event.data;
-  return <main className="public-listing event-detail-page"><Link className="back-link" to="/events">← All events</Link><section className="club-event-card event-detail-card"><Badge>{item.lifecycle_status.replaceAll('_', ' ')}</Badge><span className="eyebrow">{item.club_name}</span><h1>{item.event_name}</h1><p>{item.description || 'No event description provided.'}</p><p><CalendarDays size={15} /> {item.event_date} · {item.start_time}–{item.end_time}</p><p><MapPin size={15} /> {item.location}</p><p>{item.lifecycle_status === 'full' ? 'Registration is full; you may join the waitlist.' : item.lifecycle_status === 'registration_open' ? `${item.available_slots} seats available` : 'Registration is not open.'}</p><Link className="button button-primary" to="/student">View registration options <ArrowUpRight size={15} /></Link></section></main>;
+  return <main className="public-listing event-detail-page"><Link className="back-link" to="/events">← All events</Link><section className="club-event-card event-detail-card"><Badge>{item.lifecycle_status.replaceAll('_', ' ')}</Badge><span className="eyebrow">{item.club_name}</span><h1>{item.event_name}</h1><p>{item.description || 'No event description provided.'}</p><p><CalendarDays size={15} /> {item.event_date} · {item.start_time}–{item.end_time}</p><p><MapPin size={15} /> {item.location}</p><p>{item.entry_fee === 0 ? 'Free entry' : `Registration fee: ₹${item.entry_fee.toFixed(2)}`}</p><p>{item.lifecycle_status === 'full' ? `${item.waitlist_count} students waitlisted; join the waitlist to be considered.` : item.lifecycle_status === 'registration_open' ? `${item.available_slots} seats available` : item.lifecycle_status === 'published' && item.registration_opens_at ? `Registration opens ${item.registration_opens_at.replace('T', ' ')}` : 'Registration is not open.'}</p><EventRegistrationButton event={item} registration={registration.getRegistration(item.event_id)} isPending={registration.pendingEventId === item.event_id} isAnyPending={registration.isPending} isStatusLoading={registration.registrations.isLoading} isStatusError={registration.registrations.isError} onRegister={registration.register} /></section></main>;
 }
 
 export function EventsPage() {
-  const { user } = useAuth();
   const events = usePublicData<Event[]>('/public/events', 'events');
   const [search, setSearch] = useState('');
   const [club, setClub] = useState('');
@@ -203,7 +203,7 @@ export function EventsPage() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const clubs = usePublicData<Club[]>('/public/clubs', 'clubs');
-  const navigate = useNavigate();
+  const registration = useEventRegistration();
   const allEvents = events.data ?? [];
   const today = new Date();
   const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -228,6 +228,6 @@ export function EventsPage() {
       <label className="date-filter"><span>From</span><input type="date" aria-label="Events from date" value={fromDate} onChange={event => setFromDate(event.target.value)} /></label>
       <label className="date-filter"><span>To</span><input type="date" aria-label="Events to date" value={toDate} onChange={event => setToDate(event.target.value)} /></label>
     </div>
-    {events.isLoading ? <PageLoader label="Checking the campus calendar…" /> : events.isError ? <EmptyState title="Events couldn't be loaded" description="Please try again later." /> : filtered.length ? <div className="event-list">{filtered.slice().sort((a, b) => a.event_date.localeCompare(b.event_date)).map((event, index) => <EventCard key={event.event_id} event={event} index={index} onRegister={() => navigate(user?.role === 'student' ? '/student' : '/student/login', user?.role === 'student' ? undefined : { state: { message: 'Sign in to your student account to register for this event.' } })} />)}</div> : <EmptyState title="No events match those filters" description="Try another search or choose a different club." />}
+    {events.isLoading ? <PageLoader label="Checking the campus calendar…" /> : events.isError ? <EmptyState title="Events couldn't be loaded" description="Please try again later." /> : filtered.length ? <div className="event-list">{filtered.slice().sort((a, b) => a.event_date.localeCompare(b.event_date)).map((event, index) => <EventCard key={event.event_id} event={event} index={index} action={<EventRegistrationButton event={event} registration={registration.getRegistration(event.event_id)} isPending={registration.pendingEventId === event.event_id} isAnyPending={registration.isPending} isStatusLoading={registration.registrations.isLoading} isStatusError={registration.registrations.isError} onRegister={registration.register} compact />} />)}</div> : <EmptyState title="No events match those filters" description="Try another search or choose a different club." />}
   </main>;
 }

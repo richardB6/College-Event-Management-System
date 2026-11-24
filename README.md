@@ -47,6 +47,12 @@ For frontend development with hot reload, run `npm run dev` from `client` in a s
 - Administrator signup is not public. Provision the first administrator interactively from `backend` with `npm run admin:create`.
 - Sessions are stored in SQLite and use HTTP-only, SameSite Strict cookies. State-changing API calls require a CSRF token. Student profile and registration records are restricted to the signed-in student and authorized administrators.
 
+## Student events and updates
+
+Students can register for an event or join its waitlist from the dashboard, event listing, or event details page. Registration still uses the same server-side capacity, schedule-conflict, and waitlist rules. Students who need to sign in are returned to the selected event after login; registration is never submitted automatically.
+
+The dashboard previews up to three upcoming events and links to the full listing. Its Campus Live Updates ticker presents recent, relevant records from the existing notification center without marking them read. It shares the navigation bell's notification cache and refresh, and includes only updates scoped to the signed-in student.
+
 ## Database and migrations
 
 The database is `database/club_management.db`. On startup, the backend applies versioned migrations under `backend/migrations/`. The account/session/audit migration adds authentication fields and tables without deleting or rewriting existing club, event, registration, or student records. Existing students remain without accounts until separately registered.

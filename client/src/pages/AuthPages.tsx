@@ -6,6 +6,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuth } from '../auth/AuthContext';
 import { api } from '../lib/api';
+import { safeInternalPath } from '../lib/navigation';
 import type { Department } from '../lib/types';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../components/ui';
@@ -91,7 +92,7 @@ export function StudentLoginPage() {
   const onSubmit = handleSubmit(async values => {
     try {
       await signIn('/auth/student/login', { ...values, usn: values.usn.toUpperCase() });
-      navigate((location.state as { from?: string } | null)?.from ?? '/student', { replace: true });
+      navigate(safeInternalPath((location.state as { from?: unknown } | null)?.from) ?? '/student', { replace: true });
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Sign in failed.', 'error');
     }
